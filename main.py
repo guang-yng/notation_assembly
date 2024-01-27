@@ -3,4 +3,4 @@ from utils.dataset import MuscimaDataset
 
 if __name__ == "__main__":
     train_dataset = MuscimaDataset.load('data/default/train.pth')
-    assert train_dataset[3] == ((1746, 708, 1769, 725), '0', (790, 208, 823, 3337), '32', True)
+    assert train_dataset[3] == ((1177, 263, 1297, 324), '71', (1200, 207, 1319, 3337), '34', True)

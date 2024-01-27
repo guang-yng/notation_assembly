@@ -17,11 +17,11 @@ def generate_train(docs, ratio, clsname2id):
     for doc in tqdm(docs, desc='Generating train'):
         pos_pairs = set()
         n_sym = len(doc)
+        id2idx = {c.id: i for i, c in enumerate(doc)}
         for i, c in enumerate(doc):
-            for j in c.outlinks:
-                # TODO: Check why some outlinks are large than len(doc)
-                if j < n_sym:
-                    pos_pairs.add((i, j) if i < j else (j, i))
+            for jid in c.outlinks:
+                j = id2idx[jid]
+                pos_pairs.add((i, j) if i < j else (j, i))
         neg_pairs = set((i, j) for j in range(1, n_sym) for i in range(j)) - pos_pairs
 
         if ratio is not None:
@@ -34,10 +34,7 @@ def generate_train(docs, ratio, clsname2id):
         for i, j in pos_pairs:
             dataset.append((doc[i].bounding_box, clsname2id[doc[i].class_name], doc[j].bounding_box, clsname2id[doc[j].class_name], True))
         for i, j in neg_pairs:
-            try:
-                dataset.append((doc[i].bounding_box, clsname2id[doc[i].class_name], doc[j].bounding_box, clsname2id[doc[j].class_name], False))
-            except:
-                breakpoint()
+            dataset.append((doc[i].bounding_box, clsname2id[doc[i].class_name], doc[j].bounding_box, clsname2id[doc[j].class_name], False))
             
     return MuscimaDataset(dataset)
 
@@ -47,12 +44,12 @@ def generate_test(docs, split, clsname2id):
         n_sym = len(doc)
         graph = np.zeros((n_sym, n_sym), dtype=np.int32)
         symbols = []
+        id2idx = {c.id: i for i, c in enumerate(doc)}
         for i, c in enumerate(doc):
-            for j in c.outlinks:
-                # TODO: Check why some outlinks are large than len(doc)
-                if j < n_sym:
-                    graph[i][j] = 1
-                    graph[j][i] = 1
+            for jid in c.outlinks:
+                j = id2idx[jid]
+                graph[i][j] = 1
+                graph[j][i] = 1
             symbols.append((doc[i].bounding_box, clsname2id[doc[i].class_name]))
         dataset.append((symbols, graph))
     return MuscimaDataset(dataset, split=split)
