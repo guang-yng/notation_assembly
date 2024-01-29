@@ -10,7 +10,7 @@ from dataset import MuscimaDataset
 def set_seed(seed):
     random.seed(seed)
 
-def draw_and_save(docs, dir, margin=1):
+def draw_and_save(docs, dir, margin=1, file_extension='pdf'):
     for i, doc in enumerate(tqdm(docs, desc='Drawing')):
         top = min([c.top for c in doc])
         left = min([c.left for c in doc])
@@ -26,7 +26,7 @@ def draw_and_save(docs, dir, margin=1):
             
         canva[canva > 0] = 1
         plt.imshow(canva, cmap='gray', interpolation='nearest')
-        plt.savefig(os.path.join(dir, f"{i}.pdf"))
+        plt.savefig(os.path.join(dir, f"{i}.{file_extension}"))
 
 if __name__ == "__main__":
     parser = ArgumentParser()
@@ -35,6 +35,7 @@ if __name__ == "__main__":
                         help="data directory")
     parser.add_argument('--save_dir', default='data/default', help='The output directory')
     parser.add_argument('--seed', default=314, help='random seed')
+    parser.add_argument('--file_extension', type=str, choices=['pdf', 'png'])
                         
     args = parser.parse_args()
 
@@ -55,6 +56,6 @@ if __name__ == "__main__":
     val_docs = docs[int(0.6*len(docs)): int(0.8*len(docs))]
     test_docs = docs[int(0.8*len(docs)):]
 
-    draw_and_save(train_docs, os.path.join(args.save_dir, 'train_images'))
-    draw_and_save(val_docs, os.path.join(args.save_dir, 'val_images'))
-    draw_and_save(test_docs, os.path.join(args.save_dir, 'test_images'))
+    draw_and_save(train_docs, os.path.join(args.save_dir, 'train_images'), file_extension=args.file_extension)
+    draw_and_save(val_docs, os.path.join(args.save_dir, 'val_images'), file_extension=args.file_extension)
+    draw_and_save(test_docs, os.path.join(args.save_dir, 'test_images'), file_extension=args.file_extension)
