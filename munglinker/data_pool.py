@@ -37,7 +37,8 @@ class PairwiseMungoDataPool(Dataset):
                  max_negative_samples: int,
                  patch_size: Tuple[int, int],
                  zoom: float,
-                 grammar: DependencyGrammar = None):
+                 grammar: DependencyGrammar = None,
+                 filter_pairs: bool = False):
         """Initialize the data pool.
 
         :param mungs: The NotationGraph objects for each document
@@ -61,6 +62,8 @@ class PairwiseMungoDataPool(Dataset):
             the image will be downscaled to half the height & width
             before the patch is extracted.
 
+        :param filter_pairs: whether or not to filter the pairs
+
         """
         self.mungs = mungs
         self.images = images
@@ -80,6 +83,7 @@ class PairwiseMungoDataPool(Dataset):
         self.grammar = grammar
 
         self.length = 0
+        self.filter_pairs = filter_pairs
         self.prepare_train_entities()
 
     def __len__(self):
@@ -148,10 +152,13 @@ class PairwiseMungoDataPool(Dataset):
         self.all_mungo_pairs = []  # type: List[Tuple[Node, Node]]
         number_of_samples = 0
         for mung_index, mung in enumerate(tqdm(self.mungs, desc="Loading MuNG-pairs")):
-            object_pairs = self.get_all_neighboring_object_pairs(
-                mung.vertices,
-                max_object_distance=self.max_edge_length,
-                grammar=self.grammar)
+            if self.filter_pairs:
+                object_pairs = self.get_all_neighboring_object_pairs(
+                    mung.vertices,
+                    max_object_distance=self.max_edge_length,
+                    grammar=self.grammar)
+            else:
+                object_pairs = [(m_from, m_to) for m_from in mung.vertices if m_from.id != m_to.id for m_to in mung.vertices]
             for (m_from, m_to) in object_pairs:
                 self.all_mungo_pairs.append((m_from, m_to))
                 self.train_entities.append([mung_index, number_of_samples])
