@@ -371,7 +371,8 @@ def __load_munglinker_data(mung_root: str, images_root: str,
                            include_names: List[str] = None,
                            max_items: int = None,
                            exclude_classes=None,
-                           masks_to_bounding_boxes=False):
+                           masks_to_bounding_boxes=True,
+                           normalize_bbox=True):
     """Loads the MuNGs and corresponding images from the given folders.
     All *.xml files in ``mung_root`` are considered MuNG files, all *.png
     files in ``images_root`` are considered image files.
@@ -428,6 +429,8 @@ def __load_munglinker_data(mung_root: str, images_root: str,
                 t, l, b, r = mungo.bounding_box
                 image_mask = image[t:b, l:r]
                 mungo.set_mask(image_mask)
+                if normalize_bbox:
+                    mungo.bounding_box = (t/image.shape[0], l/image.shape[1], b/image.shape[0], r/image.shape[1])
 
         if max_items is not None:
             if len(mungs) >= max_items:
