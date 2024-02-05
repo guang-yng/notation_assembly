@@ -14,7 +14,9 @@ import tqdm
 
 
 def train(args, data, cfg, device, model):
-    
+    with open(f"{args.output_dir}/{args.exp_name}/config.yaml", 'w') as f:
+        f.write(cfg.dump())
+        
     model.train()
     if cfg.TRAIN.OPTIMIZER == "Adam":
         optimizer = torch.optim.Adam(model.parameters(), lr=cfg.TRAIN.LEARNING_RATE)
@@ -35,7 +37,7 @@ def train(args, data, cfg, device, model):
             loss.backward()
             optimizer.step()
 
-            pred = output > 0.5
+            pred = torch.sigmoid(output) > 0.5
             corr += (pred == batch['label']).sum().item()
             total += len(batch['label'])
         print(f"Epoch {epoch+1} accuracy: {corr/total}")
@@ -48,8 +50,6 @@ def train(args, data, cfg, device, model):
             torch.save(model.state_dict(), f"{args.output_dir}/{args.exp_name}/model_ep{epoch+1}.pth")
 
     torch.save(model.state_dict(), f"{args.output_dir}/{args.exp_name}/model_final.pth")
-    with open(f"{args.output_dir}/{args.exp_name}/config.yaml", 'w') as f:
-        f.write(cfg.dump())
 
     return model
 
@@ -66,7 +66,7 @@ def eval(args, data, cfg, device, model):
         batch = {k: v.to(device) for k, v in batch.items()}
         output = model(batch)
 
-        pred = output > 0.5
+        pred = torch.sigmoid(output) > 0.5
         match += (pred == batch['label']).tolist()
         labels += batch['label'].squeeze().tolist()
         corr += (pred == batch['label']).sum().item()
@@ -84,11 +84,18 @@ def main(args, data, cfg, device):
         raise ValueError(f"Model {cfg.TRAIN.MODEL} is not supported")
     model.to(device)
     
-    if args.test_only:
-        if args.load_epochs > 0:
-            model.load_state_dict(torch.load(f"{args.output_dir}/{args.exp_name}/model_ep{args.load_epochs}.pth"))
-        elif args.load_epochs == 0:
+    if args.load_epochs > 0:
+        model.load_state_dict(torch.load(f"{args.output_dir}/{args.exp_name}/model_ep{args.load_epochs}.pth"))
+    elif args.load_epochs == 0:
+        # Load the final model if it exists, otherwise load the last model
+        if os.path.exists(f"{args.output_dir}/{args.exp_name}/model_final.pth"):
             model.load_state_dict(torch.load(f"{args.output_dir}/{args.exp_name}/model_final.pth"))
+        else:
+            model_files = [f for f in os.listdir(f"{args.output_dir}/{args.exp_name}") if f.startswith("model_ep") and f.endswith(".pth")]
+            if len(model_files) > 0:
+                model_files = sorted(model_files, key=lambda x: int(x.split("_")[-1].split(".")[0][2:]), reverse=True)
+                model.load_state_dict(torch.load(f"{args.output_dir}/{args.exp_name}/{model_files[0]}"))    
+    if args.test_only:
         acc, F1 = eval(args, data['valid'], cfg, device, model)
         print(f"Accuracy: {acc}, F1: {F1}")
     else:
