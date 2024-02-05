@@ -26,7 +26,7 @@ def train(args, data, cfg, device, model):
     criterion = torch.nn.BCEWithLogitsLoss(pos_weight=torch.tensor(cfg.TRAIN.POS_WEIGHT))
     loader = DataLoader(data['train'], batch_size=cfg.TRAIN.BATCH_SIZE, shuffle=True, num_workers=cfg.SYSTEM.NUM_WORKERS)
 
-    for epoch in range(cfg.TRAIN.NUM_EPOCHS):
+    for epoch in range(args.load_epochs, cfg.TRAIN.NUM_EPOCHS):
         corr = 0
         total = 0
         for batch in tqdm.tqdm(loader):
