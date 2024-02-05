@@ -1,6 +1,6 @@
 import torch
 from torch.utils.data import DataLoader, Subset
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, precision_recall_fscore_support
 
 from munglinker.data_pool import load_munglinker_data
 
@@ -72,7 +72,8 @@ def eval(args, data, cfg, device, model):
         corr += (pred == batch['label']).sum().item()
         total += len(batch['label'])
 
-    F1 = f1_score(labels, preds)
+    precision, recall, F1, _ = precision_recall_fscore_support(labels, preds)
+    print(f"Precision: {precision}, Recall: {recall}")
     model.train()
     return corr/total, F1
 
