@@ -10,10 +10,13 @@ from mung.grammar import DependencyGrammar
 from mung.graph import NotationGraph
 from mung.io import read_nodes_from_file
 from mung.node import Node, bounding_box_intersection
+
+import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from .utils import config2data_pool_dict
+from utils.constants import node_classes_dict
 
 
 class MunglinkerDataError(ValueError):
@@ -38,7 +41,8 @@ class PairwiseMungoDataPool(Dataset):
                  patch_size: Tuple[int, int],
                  zoom: float,
                  grammar: DependencyGrammar = None,
-                 filter_pairs: bool = False):
+                 filter_pairs: bool = True,
+                 normalize_bbox: bool = True):
         """Initialize the data pool.
 
         :param mungs: The NotationGraph objects for each document
@@ -64,9 +68,19 @@ class PairwiseMungoDataPool(Dataset):
 
         :param filter_pairs: whether or not to filter the pairs
 
+        :param normalize_bbox: whether or not to normalize the bounding box
+
         """
         self.mungs = mungs
         self.images = images
+
+        if normalize_bbox:
+            for mung, image in zip(self.mungs, self.images):
+                for node in mung.vertices:
+                    node.__top = node.top / image.shape[0]
+                    node.__left = node.left / image.shape[1]
+                    node.__bottom = node.bottom / image.shape[0]
+                    node.__right = node.right / image.shape[1]
 
         self.max_edge_length = max_edge_length
         self.max_negative_samples = max_negative_samples
@@ -89,31 +103,22 @@ class PairwiseMungoDataPool(Dataset):
     def __len__(self):
         return self.length
 
-    def __getitem__(self, key):
-        if key.__class__ == int:
-            key = slice(key, key + 1)
+    def __getitem__(self, idx):
+        mung_from = self.all_mungo_pairs[idx][0]
+        mung_to = self.all_mungo_pairs[idx][1]
+        source_bbox = torch.tensor(mung_from.bounding_box)
+        source_class = torch.tensor(node_classes_dict[mung_from.class_name])
+        target_bbox = torch.tensor(mung_to.bounding_box)
+        target_class = torch.tensor(node_classes_dict[mung_to.class_name])
+        label = torch.tensor(mung_to.id in mung_from.outlinks).unsqueeze(-1).float()
 
-        batch_entities = self.train_entities[key]
-
-        # Return the patches, targets, and the MuNGos themselves
-        patches_batch = np.zeros((len(batch_entities), 3,
-                                  self.patch_height, self.patch_width))
-        targets = np.zeros(len(batch_entities))
-        mungos_from = []
-        mungos_to = []
-        for i_entity, (image_index, mungo_pair_index) in enumerate(batch_entities):
-            mungo_from, mungo_to = self.all_mungo_pairs[mungo_pair_index]
-            mungos_from.append(mungo_from)
-            mungos_to.append(mungo_to)
-            # patch = self.load_patch(image_index, mungo_from, mungo_to)
-            # patches_batch[i_entity] = patch
-
-            mungos_are_connected = mungo_to.id in mungo_from.outlinks
-            if mungos_are_connected:
-                targets[i_entity] = 1
-
-        return dict(mungos_from=mungos_from, mungos_to=mungos_to, targets=targets)
-        # return dict(mungos_from=mungos_from, mungos_to=mungos_to, patches=patches_batch, targets=targets)
+        return dict(
+            source_bbox=source_bbox,
+            source_class=source_class,
+            target_bbox=target_bbox,
+            target_class=target_class,
+            label=label
+        )
 
     def __zoom_images(self):
         images_zoomed = []
@@ -158,7 +163,11 @@ class PairwiseMungoDataPool(Dataset):
                     max_object_distance=self.max_edge_length,
                     grammar=self.grammar)
             else:
-                object_pairs = [(m_from, m_to) for m_from in mung.vertices if m_from.id != m_to.id for m_to in mung.vertices]
+                object_pairs = []
+                for m_from in mung.vertices:
+                    for m_to in mung.vertices:
+                        if m_from.id != m_to.id:
+                            object_pairs.append((m_from, m_to))
             for (m_from, m_to) in object_pairs:
                 self.all_mungo_pairs.append((m_from, m_to))
                 self.train_entities.append([mung_index, number_of_samples])
@@ -166,89 +175,6 @@ class PairwiseMungoDataPool(Dataset):
 
         self.length = number_of_samples
 
-    def load_patch(self, image_index: int, mungo_from: Node, mungo_to: Node):
-        image = self.images[image_index]
-        patch = self.get_x_patch(image, mungo_from, mungo_to)
-        return patch
-
-    def get_x_patch(self, image, mungo_from: Node, mungo_to: Node):
-        """
-        Assumes image is larger than patch.
-
-        :return: A 3 * patch_height * patch_width array. Channel 0
-            is the input image, channel 1 is the from-mungo mask,
-            channel 2 is the to-mungo mask.
-        """
-        m_vert, m_horz = self.__compute_patch_center(mungo_from, mungo_to)
-        patch_radius_v = self.patch_height // 2
-        patch_radius_h = self.patch_width // 2
-        t, l, b, r = m_vert - patch_radius_v, \
-                     m_horz - patch_radius_h, \
-                     m_vert + patch_radius_v, \
-                     m_horz + patch_radius_h
-        bbox_patch = t, l, b, r
-
-        output = np.zeros((3, (b - t), (r - l)))
-        bbox_image = 0, 0, image.shape[0], image.shape[1]
-        bbox_of_image_wrt_patch = bounding_box_intersection(bbox_image, bbox_patch)
-        i_crop_t, i_crop_l, i_crop_b, i_crop_r = bbox_of_image_wrt_patch
-        image_crop = image[i_crop_t:i_crop_b, i_crop_l:i_crop_r]
-
-        bbox_of_patch_wrt_image = bounding_box_intersection(bbox_patch, bbox_image)
-        i_patch_t, i_patch_l, i_patch_b, i_patch_r = bbox_of_patch_wrt_image
-
-        try:
-            output[0][i_patch_t:i_patch_b, i_patch_l:i_patch_r] = image_crop
-        except ValueError as e:
-            print('Image shape: {}'.format(image.shape))
-            print('Patch bbox:  {}'.format(bbox_patch))
-            print('bbox_of_image_wrt_patch: {}'.format(bbox_of_image_wrt_patch))
-            print('bbox_of_patch_wrt_image: {}'.format(bbox_of_patch_wrt_image))
-            raise MunglinkerDataError(e)
-
-        bbox_of_f_wrt_patch = bounding_box_intersection(mungo_from.bounding_box, bbox_patch)
-        if bbox_of_f_wrt_patch is None:
-            raise MunglinkerDataError('Cannot generate patch for given FROM object {}/{}'
-                                      ' -- no intersection with patch {}!'
-                                      ''.format(mungo_from.unique_id, mungo_from.bounding_box,
-                                                bbox_patch))
-        bbox_of_patch_wrt_f = bounding_box_intersection(bbox_patch, mungo_from.bounding_box)
-
-        f_mask_t, f_mask_l, f_mask_b, f_mask_r = bbox_of_f_wrt_patch
-        f_mask = mungo_from.mask[f_mask_t:f_mask_b, f_mask_l:f_mask_r]
-
-        f_patch_t, f_patch_l, f_patch_b, f_patch_r = bbox_of_patch_wrt_f
-        output[1][f_patch_t:f_patch_b, f_patch_l:f_patch_r] = f_mask
-
-        bbox_of_t_wrt_patch = bounding_box_intersection(mungo_to.bounding_box, bbox_patch)
-        if bbox_of_t_wrt_patch is None:
-            raise MunglinkerDataError('Cannot generate patch for given TO object {}/{}'
-                                      ' -- no intersection with patch {}!'
-                                      ''.format(mungo_to.unique_id, mungo_to.bounding_box,
-                                                bbox_patch))
-        bbox_of_patch_wrt_t = bounding_box_intersection(bbox_patch, mungo_to.bounding_box)
-
-        t_mask_t, t_mask_l, t_mask_b, t_mask_r = bbox_of_t_wrt_patch
-        t_mask = mungo_to.mask[t_mask_t:t_mask_b, t_mask_l:t_mask_r]
-
-        t_patch_t, t_patch_l, t_patch_b, t_patch_r = bbox_of_patch_wrt_t
-        try:
-            output[2][t_patch_t:t_patch_b, t_patch_l:t_patch_r] = t_mask
-        except ValueError:
-            print('symbol_to: {}'.format(mungo_to))
-            print('--------------- Absolute bboxes ----------')
-            print('Patch bbox: {}'.format((t, l, b, r)))
-            print('   to_bbox: {}'
-                  ''.format(mungo_to.bounding_box))
-            print('--------- w.r.t. "To" object ---------')
-            print('to_mask_bbox: {}'
-                  ''.format((t_mask_t, t_mask_l, t_mask_b, t_mask_r)))
-            print('--------- w.r.t. Patch bbox -----------')
-            print('to_patch_bbox: {}'
-                  ''.format((t_patch_t, t_patch_l, t_patch_b, t_patch_r)))
-            raise
-
-        return output
 
     def get_closest_objects(self, nodes: List[Node], threshold) -> Dict[Node, List[Node]]:
         """For each pair of Nodes, compute the closest distance between their
@@ -306,42 +232,6 @@ class PairwiseMungoDataPool(Dataset):
 
         return examples
 
-    @staticmethod
-    def __compute_patch_center(m_from: Node, m_to: Node):
-        """Computing the patch center for the given pair
-        of objects. Gets returned as (row, column) coordinates
-        with respect to the input image.
-
-        Option 1: take their center of gravity.
-
-        Option 2: if intersection, take center of intersection bbox.
-            If not, take center of line connecting closest points.
-
-        """
-        intersection_bbox = m_from.bounding_box_intersection(m_to.bounding_box)
-        if intersection_bbox is not None:
-            it, il, ib, ir = intersection_bbox
-            i_center_x = (it + ib) // 2
-            i_center_y = (il + ir) // 2
-            p_center_x, p_center_y = i_center_x + m_from.top, i_center_y + m_from.left
-        else:
-            # The "closest point" computation, which can actually be implemented
-            # as taking the middle of the bounding box that is the intersection
-            # of extending the objects' bounding boxes towards each other.
-
-            # Vertical: take max of top, min of bottom, sort
-            p_bounds_vertical = max(m_from.top, m_to.top), min(m_from.bottom, m_to.bottom)
-            # i_bounds_top, i_bounds_bottom = min(i_bounds_vertical), max(i_bounds_vertical)
-
-            # Horizontal: max of left, min of right, sort
-            p_bounds_horizontal = max(m_from.left, m_to.left), min(m_from.right, m_to.right)
-            # i_bounds_left, i_bounds_right = min(i_bounds_horizontal), max(i_bounds_horizontal)
-
-            p_center_x = sum(p_bounds_vertical) // 2
-            p_center_y = sum(p_bounds_horizontal) // 2
-
-        return p_center_x, p_center_y
-
 
 ##############################################################################
 
@@ -378,8 +268,7 @@ def __load_munglinker_data(mung_root: str, images_root: str,
                            include_names: List[str] = None,
                            max_items: int = None,
                            exclude_classes=None,
-                           masks_to_bounding_boxes=True,
-                           normalize_bbox=True):
+                           masks_to_bounding_boxes=False):
     """Loads the MuNGs and corresponding images from the given folders.
     All *.xml files in ``mung_root`` are considered MuNG files, all *.png
     files in ``images_root`` are considered image files.
@@ -436,8 +325,6 @@ def __load_munglinker_data(mung_root: str, images_root: str,
                 t, l, b, r = mungo.bounding_box
                 image_mask = image[t:b, l:r]
                 mungo.set_mask(image_mask)
-                if normalize_bbox:
-                    mungo.bounding_box = (t/image.shape[0], l/image.shape[1], b/image.shape[0], r/image.shape[1])
 
         if max_items is not None:
             if len(mungs) >= max_items:
