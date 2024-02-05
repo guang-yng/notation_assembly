@@ -18,8 +18,8 @@ Check codes for possible options.
 
 
 ## Model Training
-'''bash
+```bash
 python -m effnet.train --model_config configs/effnet/MLP32.yaml
-'''
+```
 
 To test the model, pass *--test_only* to the above command.
