@@ -16,3 +16,4 @@ typing_extensions==4.9.0
 matplotlib
 yacs
 scikit-learn
+pyyaml
