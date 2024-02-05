@@ -60,19 +60,19 @@ def eval(args, data, cfg, device, model):
 
     corr = 0
     total = 0
-    match = []
+    preds = []
     labels = []
     for batch in loader:
         batch = {k: v.to(device) for k, v in batch.items()}
         output = model(batch)
 
         pred = torch.sigmoid(output) > 0.5
-        match += (pred == batch['label']).tolist()
+        preds += pred.squeeze().tolist()
         labels += batch['label'].squeeze().tolist()
         corr += (pred == batch['label']).sum().item()
         total += len(batch['label'])
 
-    F1 = f1_score(labels, match)
+    F1 = f1_score(labels, preds)
     model.train()
     return corr/total, F1
 
@@ -86,7 +86,7 @@ def main(args, data, cfg, device):
     
     if args.load_epochs > 0:
         model.load_state_dict(torch.load(f"{args.output_dir}/{args.exp_name}/model_ep{args.load_epochs}.pth"))
-    elif args.load_epochs == 0:
+    elif args.load_epochs == 0 or args.test_only:
         # Load the final model if it exists, otherwise load the last model
         if os.path.exists(f"{args.output_dir}/{args.exp_name}/model_final.pth"):
             model.load_state_dict(torch.load(f"{args.output_dir}/{args.exp_name}/model_final.pth"))
