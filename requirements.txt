@@ -14,3 +14,6 @@ torch==1.11.0
 tqdm==4.66.1
 typing_extensions==4.9.0
 matplotlib
+yacs
+scikit-learn
+pyyaml
