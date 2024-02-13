@@ -1,6 +1,7 @@
 import torch
 from torch.utils.data import DataLoader, Subset
-from sklearn.metrics import f1_score, precision_recall_fscore_support
+from sklearn.metrics import f1_score, precision_recall_fscore_support, PrecisionRecallDisplay, precision_recall_curve
+import matplotlib.pyplot as plt
 
 from munglinker.data_pool import load_munglinker_data
 
@@ -54,7 +55,7 @@ def train(args, data, cfg, device, model):
     return model
 
 
-def eval(args, data, cfg, device, model):
+def eval(args, data, cfg, device, model, plot_PRC=False):
     model.eval()
     loader = DataLoader(data, batch_size=cfg.TRAIN.BATCH_SIZE, shuffle=False, num_workers=cfg.SYSTEM.NUM_WORKERS)
 
@@ -62,17 +63,28 @@ def eval(args, data, cfg, device, model):
     total = 0
     preds = []
     labels = []
-    for batch in loader:
+    logits = []
+    for batch in tqdm.tqdm(loader):
         batch = {k: v.to(device) for k, v in batch.items()}
         output = model(batch)
 
-        pred = torch.sigmoid(output) > 0.5
+        logit = torch.sigmoid(output)
+        logits += logit.squeeze().tolist()
+        pred = logit > 0.5
         preds += pred.squeeze().tolist()
         labels += batch['label'].squeeze().tolist()
         corr += (pred == batch['label']).sum().item()
         total += len(batch['label'])
 
     precision, recall, F1, _ = precision_recall_fscore_support(labels, preds)
+    if plot_PRC:
+        prec, rec, _ = precision_recall_curve(labels, logits)
+        plt.plot(rec, prec)
+        plt.xlabel("Recall")
+        plt.ylabel("Precision")
+        plt.title("Precision-Recall Curve")
+        plt.show()
+        plt.savefig(f"{args.output_dir}/{args.exp_name}/PRC.png")
     print(f"Precision: {precision}, Recall: {recall}")
     model.train()
     return corr/total, F1
@@ -97,7 +109,7 @@ def main(args, data, cfg, device):
                 model_files = sorted(model_files, key=lambda x: int(x.split("_")[-1].split(".")[0][2:]), reverse=True)
                 model.load_state_dict(torch.load(f"{args.output_dir}/{args.exp_name}/{model_files[0]}"))    
     if args.test_only:
-        acc, F1 = eval(args, data['valid'], cfg, device, model)
+        acc, F1 = eval(args, data['test'], cfg, device, model, plot_PRC=True)
         print(f"Accuracy: {acc}, F1: {F1}")
     else:
         model = train(args, data, cfg, device, model)
@@ -120,12 +132,19 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    cfg = get_cfg_defaults()
+    if args.test_only:
+        cfg.merge_from_file(os.path.join(args.output_dir, args.exp_name, "config.yaml"))
+    if args.model_config and not args.test_only:
+        cfg.merge_from_file(args.model_config)
+    cfg.merge_from_list(args.opts)
+
     if not args.test_only:
         data = load_munglinker_data(
             mung_root=args.mung_root,
             images_root=args.image_root,
             split_file=args.split_file,
-            config_file=args.data_config,
+            config_file=cfg.DATA.DATA_CONFIG,
             load_training_data=True,
             load_validation_data=True,
             load_test_data=False,
@@ -135,18 +154,11 @@ if __name__ == "__main__":
             mung_root=args.mung_root,
             images_root=args.image_root,
             split_file=args.split_file,
-            config_file=args.data_config,
+            config_file=cfg.DATA.DATA_CONFIG,
             load_training_data=False,
-            load_validation_data=True,
-            load_test_data=False,
+            load_validation_data=False,
+            load_test_data=True,
         )
-
-    cfg = get_cfg_defaults()
-    if args.test_only:
-        cfg.merge_from_file(os.path.join(args.output_dir, args.exp_name, "config.yaml"))
-    if args.model_config and not args.test_only:
-        cfg.merge_from_file(args.model_config)
-    cfg.merge_from_list(args.opts)
 
     if cfg.SYSTEM.NUM_GPUS > 0:
         if not torch.cuda.is_available():
