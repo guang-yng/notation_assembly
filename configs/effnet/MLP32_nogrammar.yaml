@@ -1,0 +1,7 @@
+TRAIN:
+  NUM_EPOCHS: 200
+  EVAL_FREQUENCY: 5
+  SAVE_FREQUENCY: 20
+  BATCH_SIZE : 256
+DATA:
+  DATA_CONFIG: configs/muscima_nogrammar.yaml
