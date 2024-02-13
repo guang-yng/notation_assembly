@@ -1,6 +1,6 @@
 import torch
 from torch.utils.data import DataLoader, Subset
-from sklearn.metrics import f1_score, precision_recall_fscore_support, PrecisionRecallDisplay, precision_recall_curve
+from sklearn.metrics import f1_score, precision_recall_fscore_support, PrecisionRecallDisplay, precision_recall_curve, auc
 import matplotlib.pyplot as plt
 
 from munglinker.data_pool import load_munglinker_data
@@ -84,7 +84,10 @@ def eval(args, data, cfg, device, model, plot_PRC=False):
         plt.ylabel("Precision")
         plt.title("Precision-Recall Curve")
         plt.show()
-        plt.savefig(f"{args.output_dir}/{args.exp_name}/PRC.png")
+        auc_score = auc(rec, prec)
+        plt.savefig(f"{args.output_dir}/{args.exp_name}/PRC_ep{args.load_epochs}_pert{args.class_perturb}.png")
+        print(f"AUC: {auc_score}")
+        plt.close()
     print(f"Precision: {precision}, Recall: {recall}")
     model.train()
     return corr/total, F1
@@ -127,6 +130,7 @@ if __name__ == "__main__":
     parser.add_argument('--output_dir', type=str, default="outputs")
     parser.add_argument('--exp_name', type=str)
     parser.add_argument('--test_only', action="store_true")
+    parser.add_argument('--class_perturb', type=float, default=0.0)
     parser.add_argument('--load_epochs', type=int, default=-1)
     parser.add_argument('--opts', default=[], nargs=argparse.REMAINDER, help="options to overwrite the config")
 
@@ -158,6 +162,7 @@ if __name__ == "__main__":
             load_training_data=False,
             load_validation_data=False,
             load_test_data=True,
+            class_perturb=args.class_perturb
         )
 
     if cfg.SYSTEM.NUM_GPUS > 0:
