@@ -398,7 +398,7 @@ def load_munglinker_data(mung_root, images_root, split_file,
                                                      include_names=split['valid'],
                                                      exclude_classes=exclude_classes,
                                                      masks_to_bounding_boxes=train_on_bounding_boxes)
-        validation_pool = PairwiseMungoDataPool(mungs=va_mungs, images=va_images, **validation_data_pool_dict)
+        validation_pool = PairwiseMungoDataPool(mungs=va_mungs, images=va_images, filter_pairs=False, **validation_data_pool_dict)
 
     if load_test_data:
         print("Loading test data...")
@@ -406,6 +406,6 @@ def load_munglinker_data(mung_root, images_root, split_file,
                                                      include_names=split['test'],
                                                      exclude_classes=exclude_classes,
                                                      masks_to_bounding_boxes=train_on_bounding_boxes)
-        test_pool = PairwiseMungoDataPool(mungs=te_mungs, images=te_images, **data_pool_dict)
+        test_pool = PairwiseMungoDataPool(mungs=te_mungs, images=te_images, filter_pairs=False, **data_pool_dict)
 
     return dict(train=training_pool, valid=validation_pool, test=test_pool)
