@@ -2,6 +2,7 @@ import copy
 import os
 from glob import glob
 from typing import List, Tuple, Dict
+import random
 
 import numpy as np
 import yaml
@@ -16,7 +17,7 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from .utils import config2data_pool_dict
-from utils.constants import node_classes_dict
+from utils.constants import node_classes_dict, node_class_dict_count100
 
 
 class MunglinkerDataError(ValueError):
@@ -42,7 +43,8 @@ class PairwiseMungoDataPool(Dataset):
                  zoom: float,
                  grammar: DependencyGrammar = None,
                  filter_pairs: bool = True,
-                 normalize_bbox: bool = True):
+                 normalize_bbox: bool = True,
+                 class_perturb=0.0):
         """Initialize the data pool.
 
         :param mungs: The NotationGraph objects for each document
@@ -98,6 +100,8 @@ class PairwiseMungoDataPool(Dataset):
 
         self.length = 0
         self.filter_pairs = filter_pairs
+        self.class_perturb = class_perturb
+        
         self.prepare_train_entities()
 
     def __len__(self):
@@ -107,7 +111,10 @@ class PairwiseMungoDataPool(Dataset):
         mung_from = self.all_mungo_pairs[idx][0]
         mung_to = self.all_mungo_pairs[idx][1]
         source_bbox = torch.tensor(mung_from.bounding_box)
-        source_class = torch.tensor(node_classes_dict[mung_from.class_name])
+        if random.random() < self.class_perturb:
+            source_class = torch.tensor(random.choice(list(node_class_dict_count100.values())))
+        else:
+            source_class = torch.tensor(node_classes_dict[mung_from.class_name])
         target_bbox = torch.tensor(mung_to.bounding_box)
         target_class = torch.tensor(node_classes_dict[mung_to.class_name])
         label = torch.tensor(mung_to.id in mung_from.outlinks).unsqueeze(-1).float()
@@ -338,7 +345,8 @@ def load_munglinker_data(mung_root, images_root, split_file,
                          load_training_data=True,
                          load_validation_data=True,
                          load_test_data=False,
-                         exclude_classes=None) -> Dict[str, PairwiseMungoDataPool]:
+                         exclude_classes=None,
+                         class_perturb=0.0) -> Dict[str, PairwiseMungoDataPool]:
     """Loads the train/validation/test data pools for the MuNGLinker
     experiments.
 
@@ -371,6 +379,7 @@ def load_munglinker_data(mung_root, images_root, split_file,
 
     config = load_config(config_file)
     data_pool_dict = config2data_pool_dict(config)
+    data_pool_dict['class_perturb'] = class_perturb
 
     if 'TRAIN_ON_BOUNDING_BOXES' in config:
         train_on_bounding_boxes = config['TRAIN_ON_BOUNDING_BOXES']
