@@ -9,6 +9,10 @@ _C.SYSTEM.NUM_GPUS = 1
 _C.SYSTEM.NUM_WORKERS = 4
 _C.SYSTEM.SEED = 42
 
+# Data setup
+_C.DATA = CN()
+_C.DATA.DATA_CONFIG = "configs/muscima_bboxes.yaml"
+
 # Model setup
 _C.MODEL = CN()
 _C.MODEL.MODE = "MLP"
