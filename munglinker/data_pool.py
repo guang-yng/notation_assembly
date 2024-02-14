@@ -71,7 +71,7 @@ class PairwiseMungoDataPool(Dataset):
         :param normalize_bbox: whether or not to normalize the bounding box
 
         """
-        self.filter_by_distance_portion = []
+        # self.filter_by_distance_portion = []
         self.mungs = mungs
         self.images = images
 
@@ -100,8 +100,7 @@ class PairwiseMungoDataPool(Dataset):
         self.length = 0
         self.filter_pairs = filter_pairs
         self.prepare_train_entities()
-        print(np.mean(self.filter_by_distance_portion))
-        exit(0)
+        # print(np.mean(self.filter_by_distance_portion))
 
     def __len__(self):
         return self.length
@@ -161,7 +160,6 @@ class PairwiseMungoDataPool(Dataset):
         number_of_samples = 0
         for mung_index, mung in enumerate(tqdm(self.mungs, desc="Loading MuNG-pairs")):
             if self.filter_pairs:
-                print(mung.__from_file__)
                 object_pairs = self.get_all_neighboring_object_pairs(
                     mung.vertices,
                     max_object_distance=self.max_edge_length,
@@ -222,23 +220,23 @@ class PairwiseMungoDataPool(Dataset):
                 examples.append((c, d))
 
         # Validate that every link from the ground-truth also has a candidate in the examples - all positives are included
-        print("Validating...")
-        print(f"Max distance: {max_object_distance}")
-        id_to_cropobject_mapping = {cropobject.id: cropobject for cropobject in nodes}
-        total_edges, filter_by_distance = 0, 0
-        for n1 in nodes:
-            for n2id in n1.outlinks:
-                n2 = id_to_cropobject_mapping[n2id]
-                if not grammar.validate_edge(n1.class_name, n2.class_name):
-                    if 'staff' not in n1.class_name and 'staff' not in n2.class_name and 'Text' not in n1.class_name and 'Text' not in n2.class_name and 'dottedHorizontalSpanner' not in n1.class_name:
-                        print(n1.class_name, n2.class_name)
-                        exit(0)
-                    continue
-                total_edges += 1
-                if n1.distance_to(n2) >= max_object_distance:
-                    filter_by_distance += 1
-        print(f"Filter by distance portion: {filter_by_distance/total_edges}")
-        self.filter_by_distance_portion.append(filter_by_distance/total_edges)
+        # print("Validating...")
+        # print(f"Max distance: {max_object_distance}")
+        # id_to_cropobject_mapping = {cropobject.id: cropobject for cropobject in nodes}
+        # total_edges, filter_by_distance = 0, 0
+        # for n1 in nodes:
+        #     for n2id in n1.outlinks:
+        #         n2 = id_to_cropobject_mapping[n2id]
+        #         if not grammar.validate_edge(n1.class_name, n2.class_name):
+        #             if 'staff' not in n1.class_name and 'staff' not in n2.class_name and 'Text' not in n1.class_name and 'Text' not in n2.class_name and 'dottedHorizontalSpanner' not in n1.class_name:
+        #                 print(n1.class_name, n2.class_name)
+        #                 exit(0)
+        #             continue
+        #         total_edges += 1
+        #         if n1.distance_to(n2) >= max_object_distance:
+        #             filter_by_distance += 1
+        # print(f"Filter by distance portion: {filter_by_distance/total_edges}")
+        # self.filter_by_distance_portion.append(filter_by_distance/total_edges)
 
         return examples
 
@@ -266,7 +264,6 @@ def __load_mung(filename: str, exclude_classes: List[str]) -> NotationGraph:
     objects_to_exclude = [m for m in mungos if m.class_name in exclude_classes]
     for m in objects_to_exclude:
         mung.remove_vertex(m.id)
-    mung.__from_file__ = filename
     return mung
 
 
