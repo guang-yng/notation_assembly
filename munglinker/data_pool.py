@@ -73,6 +73,7 @@ class PairwiseMungoDataPool(Dataset):
         :param normalize_bbox: whether or not to normalize the bounding box
 
         """
+        # self.filter_by_distance_portion = []
         self.mungs = mungs
         self.images = images
 
@@ -103,6 +104,7 @@ class PairwiseMungoDataPool(Dataset):
         self.class_perturb = class_perturb
         
         self.prepare_train_entities()
+        # print(np.mean(self.filter_by_distance_portion))
 
     def __len__(self):
         return self.length
@@ -224,18 +226,24 @@ class PairwiseMungoDataPool(Dataset):
             for d in example_pairs_dict[c]:
                 examples.append((c, d))
 
-        # # Validate that every link from the ground-truth also has a candidate in the examples - all positives are included
-        # id_to_cropobject_mapping = {cropobject.objid: cropobject for cropobject in cropobjects}
-        # missing_edges = 0
-        # for cropobject in cropobjects:
-        #     for outlink_id in cropobject.outlinks:
-        #         pair1 = (cropobject, id_to_cropobject_mapping[outlink_id])
-        #         pair2 = (id_to_cropobject_mapping[outlink_id], cropobject)
-        #
-        #         if pair1 in examples or pair2 in examples:
+        # Validate that every link from the ground-truth also has a candidate in the examples - all positives are included
+        # print("Validating...")
+        # print(f"Max distance: {max_object_distance}")
+        # id_to_cropobject_mapping = {cropobject.id: cropobject for cropobject in nodes}
+        # total_edges, filter_by_distance = 0, 0
+        # for n1 in nodes:
+        #     for n2id in n1.outlinks:
+        #         n2 = id_to_cropobject_mapping[n2id]
+        #         if not grammar.validate_edge(n1.class_name, n2.class_name):
+        #             if 'staff' not in n1.class_name and 'staff' not in n2.class_name and 'Text' not in n1.class_name and 'Text' not in n2.class_name and 'dottedHorizontalSpanner' not in n1.class_name:
+        #                 print(n1.class_name, n2.class_name)
+        #                 exit(0)
         #             continue
-        #         else:
-        #             missing_edges += 1
+        #         total_edges += 1
+        #         if n1.distance_to(n2) >= max_object_distance:
+        #             filter_by_distance += 1
+        # print(f"Filter by distance portion: {filter_by_distance/total_edges}")
+        # self.filter_by_distance_portion.append(filter_by_distance/total_edges)
 
         return examples
 
