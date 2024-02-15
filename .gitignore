@@ -167,3 +167,8 @@ cython_debug/
 data/**
 !data/MUSCIMA++
 env_notation/
+
+# object detection
+runs/*
+objectdetection/datasets_w_staff/*
+objectdetection/weights/*
