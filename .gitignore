@@ -170,5 +170,6 @@ env_notation/
 
 # object detection
 runs/*
+objectdetection/runs/*
 objectdetection/datasets_w_staff/*
 objectdetection/weights/*

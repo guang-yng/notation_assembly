@@ -1,0 +1,27 @@
+path: ../MUSCIMA++/datasets_r_staff_20 # dataset root dir
+train: train/images 
+val: valid/images 
+test: test/images 
+
+# Classes
+names:
+  0 : noteheadEmpty
+  1 : noteheadFull
+  2 : stem
+  3 : beam
+  4 : legerLine
+  5 : augmentationDot
+  6 : slur
+  7 : rest8th
+  8 : accidentalNatural
+  9 : accidentalFlat
+  10 : accidentalSharp
+  11 : barline
+  12 : gClef
+  13 : fClef
+  14 : dynamicLetterP
+  15 : dynamicLetterM
+  16 : dynamicLetterF
+  17 : keySignature
+  18 : flag8thUp
+  19 : flag8thDown

@@ -23,3 +23,6 @@ python -m effnet.train --model_config configs/effnet/MLP32.yaml
 ```
 
 To test the model, pass *--test_only* to the above command.
+
+## Object Detection Data & Training
+Check [README](objectdetection/README.md) for details.
