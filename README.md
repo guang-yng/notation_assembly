@@ -26,3 +26,13 @@ To test the model, pass *--test_only* to the above command.
 
 ## Object Detection Data & Training
 Check [README](objectdetection/README.md) for details.
+
+
+## Other scripts
+
+### Generate sample images for each class
+
+```bash
+python utils/visualize_classes.py
+```
+Run `python utils/visualize_classes.py -h` to get available arguments.

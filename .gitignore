@@ -173,3 +173,5 @@ runs/*
 objectdetection/runs/*
 objectdetection/datasets_w_staff/*
 objectdetection/weights/*
+
+class_sample_images
