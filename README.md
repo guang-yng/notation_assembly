@@ -17,7 +17,7 @@ python utils/data_gen.py
 Check codes for possible options.
 
 
-## Model Training
+## Notation Assembler Training
 ```bash
 python -m effnet.train --model_config configs/effnet/MLP32.yaml
 ```
