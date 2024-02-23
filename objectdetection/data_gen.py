@@ -1,47 +1,18 @@
 import os
-import torch
+import shutil
 from tqdm import tqdm
 import random
-import itertools
-import numpy as np
 from argparse import ArgumentParser
 from xml.etree import ElementTree
 from mung.io import read_nodes_from_file
 import shutil
-from omrdatasettools import Downloader, OmrDataset
-
-CLASSNAME2ID = {
-    "noteheadHalf": 0, "noteheadWhole": 0, 
-    "noteheadFull": 1,
-    "stem": 2,
-    "beam": 3,
-    "legerLine": 4,
-    "augmentationDot": 5,
-    "slur": 6,
-    "rest8th": 7,
-    "accidentalNatural": 8,
-    "accidentalFlat": 9,
-    "accidentalSharp": 10,
-    "barline": 11, 
-    "gClef": 12,
-    "fClef": 13,
-    "dynamicLetterP": 14,
-    "dynamicLetterM": 15,
-    "dynamicLetterF": 16,
-    "keySignature": 17,
-    "flag8thUp": 18,
-    "flag8thDown": 19,
-}
+from PIL import Image
+from constants import RESTRICTEDCLASSES20, ESSENTIALCLSSES
 
 def set_seed(seed):
     random.seed(seed)
 
-from PIL import Image
-import shutil
-import os
-from tqdm import tqdm
-
-def generate(docs, clsname2id, save_dir, mode, crop_times = 0, image_source_dir = "MUSCIMA++/datasets_r_staff/images"):
+def generate(docs, clsname2id, save_dir, mode, crop_times, image_source_dir):
     images_dir = os.path.join(save_dir, mode, 'images')
     labels_dir = os.path.join(save_dir, mode, 'labels')
     # Create (or clear) directories
@@ -50,16 +21,14 @@ def generate(docs, clsname2id, save_dir, mode, crop_times = 0, image_source_dir 
 
     for doc in tqdm(docs, desc=f'Generating {mode}'):
         doc_name = doc[0].document
-
-        doc_name = doc_name.replace("ideal", "symbol")
-
-        
         src_path = os.path.join(image_source_dir, f"{doc_name}.png")
+        if not os.path.exists(src_path):
+            doc_name = doc_name.replace("ideal", "symbol")
+            src_path = os.path.join(image_source_dir, f"{doc_name}.png")
         
         if crop_times == 0:
             dst_path = os.path.join(images_dir, f"{doc_name}.png")
             
-            print(doc_name, src_path, dst_path )
             # Copy the image to the target file
             shutil.copy(src_path, dst_path)
             
@@ -81,8 +50,6 @@ def generate(docs, clsname2id, save_dir, mode, crop_times = 0, image_source_dir 
                         
                         # Write to label file
                         f.write(f"{clsname2id[node.class_name]} {x_center} {y_center} {width} {height}\n")
-                    else: 
-                        print("Skip class: ", node.class_name)
         else:
             with Image.open(src_path) as img:
                 source_img_width, source_img_height = img.size
@@ -119,112 +86,64 @@ def generate(docs, clsname2id, save_dir, mode, crop_times = 0, image_source_dir 
                             
                             # Write to label file
                             f.write(f"{clsname2id[node.class_name]} {x_center} {y_center} {width} {height}\n")
-                        else: 
-                            print("Skip class: ", node.class_name)
-
-
-import glob
-import shutil
-import os
-
-def copy_and_rename_images(source_dir, target_dir):
-    """
-    Copies all .png files from source directories matching the pattern to the target directory
-    with a new naming convention.
-
-    Parameters:
-    - source_dir: The source directory containing the image files.
-    - target_dir: The target directory where the renamed image files will be copied.
-    """
-    # Create the target directory if it does not exist
-    os.makedirs(target_dir, exist_ok=True)
-    
-    # Pattern to match all PNG files in the specified source directory structure
-    pattern = os.path.join(source_dir, 'ideal', 'w-*', 'symbol', '*.png')
-    
-    for file_path in glob.glob(pattern):
-        # Extract parts of the file path
-        parts = file_path.split(os.sep)
-        
-        # Extract the writer number 'w-xx'
-        writer = parts[-3]
-        
-        # Extract the page number 'pXXX.png'
-        page = parts[-1].split('.')[0][-2:]
-        
-        # Construct the symbol file name
-        new_file_name = f'CVC-MUSCIMA_W-{writer.split("-")[1]}_N-{page}_D-symbol.png'
-
-        # Construct the ideal file name
-        ideal_file_name = f'CVC-MUSCIMA_W-{writer.split("-")[1]}_N-{page}_D-ideal.png'
-
-        annotated_image_path = f"yolo_object_detection/{dataset}/images/"
-
-
-        print(os.path.join(annotated_image_path, ideal_file_name))
-        if os.path.exists(os.path.join(annotated_image_path, ideal_file_name)):
-
-        
-            # Construct the full target file path
-            target_file_path = os.path.join(target_dir, new_file_name)
-            
-            # Copy and rename the file
-            shutil.copy(file_path, target_file_path)
-            print(f'Copied and renamed {file_path} to {target_file_path}')
-
-
 
 if __name__ == "__main__":
-    # # Build images folder
-    # source_dir = 'data/MUSCIMA++/CvcMuscima-Distortions'
-    # target_dir = 'yolo_object_detection/datasets_staff_removed/images'  # Current directory
-    # copy_and_rename_images(source_dir, target_dir)
 
     parser = ArgumentParser()
     parser.add_argument('-d', '--data', 
                         default='MUSCIMA++/v2.0/data/annotations',
-                        help="data directory")
+                        help="data directory of annotations")
+    parser.add_argument('--image_dir', default="MUSCIMA++/datasets_r_staff/images", help='data directory of images')
     parser.add_argument('--classes', default='MUSCIMA++/v2.0/specifications/mff-muscima-mlclasses-annot.xml',
-                        help='the path to the musima classes definition xml file')
+                        help="The path to the musima classes definition xml file. If set to '20', 20 restricted classes are used. If set to 'essential', essential classes are used.")
     parser.add_argument('--save_dir', default='MUSCIMA++/datasets_r_staff_20_crop', help='The output directory')
+    parser.add_argument('--save_config', default='data_staff_removed_20_crop.yaml', help='The path to save yaml file')
     parser.add_argument('--seed', default=314, help='random seed')
-    parser.add_argument('--crop_times', default=14, help='number of crops for each image')
+    parser.add_argument('--crop_times', default=14, type=int, help='number of crops for each image')
                         
     args = parser.parse_args()
 
-
     set_seed(args.seed)
 
-    # downloader = Downloader()
-    # downloader.download_and_extract_dataset(MuscimaPlusPlus_Images, "data")
-
+    print("Reading annotations...")
     cropobject_fnames = [os.path.join(args.data, f) for f in os.listdir(args.data) if f.endswith('xml')]
     docs = [read_nodes_from_file(f) for f in cropobject_fnames]
     random.shuffle(docs)
     train_docs = docs[:int(0.6*len(docs))]
     val_docs = docs[int(0.6*len(docs)): int(0.8*len(docs))]
     test_docs = docs[int(0.8*len(docs)):]
-
     print("Annotations Loaded.")
 
-    # clsname2id = {}
-    # tree = ElementTree.parse(args.classes)
-    # root = tree.getroot()
-    # for nodeclass in root:
-    #     clsname = nodeclass.find('Name').text
-    #     idx = nodeclass.find('Id').text
-    #     clsname2id[clsname] = idx
+    if args.classes == '20':
+        clsname2id = RESTRICTEDCLASSES20
+        idclsname = [(0, 'noteheadEmpty')] + [(clsname2id[clsname], clsname) for clsname in clsname2id if clsname2id[clsname] != 0]
+    elif args.classes == 'essential':
+        clsname2id = ESSENTIALCLSSES
+        idclsname = [(clsname2id[clsname], clsname) for clsname in clsname2id]
+    else:
+        clsname2id = {}
+        idclsname = []
+        tree = ElementTree.parse(args.classes)
+        root = tree.getroot()
+        for nodeclass in root:
+            clsname = nodeclass.find('Name').text
+            idx = nodeclass.find('Id').text
+            idclsname.append((int(idx), clsname))
+        idclsname.sort()
+        for idx, idcls in enumerate(idclsname):
+            clsname2id[idcls[1]] = idx
 
-    clsname2id = CLASSNAME2ID
+    for mode, doc_split in zip(("train", "valid", "test"), (train_docs, val_docs, test_docs)):
+        print(f"Processing {mode}...")
+        generate(doc_split, clsname2id, args.save_dir, mode, args.crop_times, args.image_dir)
+        print("DONE.")
 
-    print("Train...")
-    generate(train_docs, clsname2id, args.save_dir, "train", args.crop_times)
-    print("Val...")
-    generate(val_docs, clsname2id, args.save_dir, "valid", args.crop_times)
-    print("Test...")
-    generate(test_docs, clsname2id, args.save_dir,  "test", args.crop_times)
-
+    print("Writing yaml...")
+    with open(args.save_config, 'w') as f:
+        f.write(f"path: ../{args.save_dir} # dataset root dir\n")
+        f.write("train: train/images \nval: valid/images \ntest: test/images \n\n")
+        f.write("# Classes\nnames:\n")
+        for idx, idcls in enumerate(idclsname):
+            f.write(f"  {idx} : {idcls[1]}\n")
     
     print("DONE.")
-
-  
