@@ -26,7 +26,7 @@ def generate(docs, clsname2id, save_dir, mode, crop_times, image_source_dir):
             doc_name = doc_name.replace("ideal", "symbol")
             src_path = os.path.join(image_source_dir, f"{doc_name}.png")
         
-        if crop_times == 0:
+        if crop_times == 0 or mode == 'test':
             dst_path = os.path.join(images_dir, f"{doc_name}.png")
             
             # Copy the image to the target file
@@ -70,7 +70,6 @@ def generate(docs, clsname2id, save_dir, mode, crop_times, image_source_dir):
                 dst_path = os.path.join(images_dir, f"{doc_name}_{times}.png")
                 with Image.open(src_path) as img:
                     img = img.crop((x, y, x+1216, y+1216))
-                    img.resize((608, 608))
                     img.save(dst_path)
                 with open(os.path.join(labels_dir, f"{doc_name}_{times}.txt"), "w") as f:
                     for _, node in enumerate(doc):
