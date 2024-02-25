@@ -1,10 +1,10 @@
 import os
 import numpy as np
 from xml.etree import ElementTree
-import xml.etree.cElementTree as ET
+import xml.etree.ElementTree as ET
 from tqdm import tqdm
 from PIL import Image, ImageDraw
-from ultralytics import YOLO
+from model import YOLOSoft
 from argparse import ArgumentParser
 from ultralytics.utils.metrics import bbox_iou
 from ultralytics.utils.plotting import Colors
@@ -43,7 +43,7 @@ if __name__ == "__main__":
     os.makedirs(args.save_dir, exist_ok=True)
 
     print("Loading model...")
-    model = YOLO(args.model)
+    model = YOLOSoft(args.model)
     print("Done.")
     test_path = os.path.join(args.data, 'test', 'images')
     images = []
@@ -61,7 +61,7 @@ if __name__ == "__main__":
     results = []
     for idx in tqdm(range(0, len(images), args.batch_size), desc='predicting...'):
         batch_imgs = images[idx:min(idx+args.batch_size, len(images))]
-        results.extend(model(batch_imgs))
+        results.extend(model(batch_imgs, verbose=False))
     imgname2preds = {}
     for index, result in tqdm(zip(indices, results), desc="merging results...", total=len(indices)):
         img_name, x_id, y_id = index
@@ -72,10 +72,10 @@ if __name__ == "__main__":
         preds_list = []
         preds_dict[(x_id, y_id)] = preds_list
 
-        def remove_truncated(plist, true_box, clsid):
+        def remove_truncated(plist, true_box, prob):
             to_remove = None
-            for idx, (box_pre, cls_pre) in enumerate(plist):
-                if cls_pre != clsid:
+            for idx, (box_pre, prob_pre) in enumerate(plist):
+                if np.dot(prob.data, prob_pre.data) < 0.25:
                     continue
                 if bbox_iop(box_pre, true_box) > 0.80:
                     to_remove = idx
@@ -83,20 +83,20 @@ if __name__ == "__main__":
             if to_remove:
                 del plist[to_remove]
 
-        for box in result.boxes:
+        for box, prob in zip(result.boxes, result.probs):
             bbox = box.xyxy.squeeze().cpu().numpy()
+            probdata = prob.cpu().numpy()
             left, top, right, bottom = bbox
             if (right <= 2*MARGIN and x_id > 0) or (bottom <= 2*MARGIN and y_id > 0):
                 continue
             true_box = bbox + np.array([offset[0], offset[1], offset[0], offset[1]])
-            clsid = int(box.cls.item())
             if (x_id > 0 and left < 2*MARGIN):
                 assert (x_id-1, y_id) in preds_dict
-                remove_truncated(preds_dict[(x_id-1, y_id)], true_box, clsid)
+                remove_truncated(preds_dict[(x_id-1, y_id)], true_box, probdata)
             if (y_id > 0 and top < 2*MARGIN):
                 assert (x_id, y_id-1) in preds_dict
-                remove_truncated(preds_dict[(x_id, y_id-1)], true_box, clsid)
-            preds_list.append((true_box, clsid))
+                remove_truncated(preds_dict[(x_id, y_id-1)], true_box, probdata)
+            preds_list.append((true_box, probdata))
             
     # Visualize
     if args.visualize:
@@ -106,9 +106,8 @@ if __name__ == "__main__":
             img = Image.open(os.path.join(test_path, img_name)).convert("RGB")
             draw = ImageDraw.Draw(img)
             for (x_id, y_id), preds_list in preds_dict.items():
-                for box, clsid in preds_list:
-                    draw.rectangle(tuple(box), outline=color_palette(clsid), width=3)
-                x_id*STEP_SIZE
+                for box, prob in preds_list:
+                    draw.rectangle(tuple(box), outline=color_palette(int(prob.top1)), width=3)
                 if args.grids:
                     draw.rectangle((x_id*STEP_SIZE, y_id*STEP_SIZE, (x_id+1)*STEP_SIZE, (y_id+1)*STEP_SIZE), outline=(255, 255, 255), width=2)
                     draw.rectangle((x_id*STEP_SIZE+MARGIN, y_id*STEP_SIZE+MARGIN, (x_id+1)*STEP_SIZE-MARGIN, (y_id+1)*STEP_SIZE-MARGIN), outline=(255, 255, 255), width=2)
@@ -145,14 +144,18 @@ if __name__ == "__main__":
         root.set("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance")
         root.set("xsi:noNamespaceSchemaLocation", "CVC-MUSCIMA_Schema.xsd")
         count = 0
+        soft_classes = []
         for preds_list in preds_dict.values():
-            for box, clsid in preds_list:
+            for box, prob in preds_list:
                 node = ET.SubElement(root, "Node")
                 ET.SubElement(node, "Id").text = str(count)
-                ET.SubElement(node, "ClassName").text = id2clsname[clsid]
+                ET.SubElement(node, "ClassName").text = id2clsname[int(prob.top1)]
+                soft_classes.append(prob.data)
                 ET.SubElement(node, "Top").text = str(box[1].item())
                 ET.SubElement(node, "Left").text = str(box[0].item())
                 ET.SubElement(node, "Width").text = str((box[2]-box[0]).item())
                 ET.SubElement(node, "Height").text = str((box[3]-box[1]).item())
                 count += 1
+        ET.indent(root, space="\t", level=0)
         ET.ElementTree(root).write(os.path.join(args.save_dir, 'annotations', f"{doc_name}.xml"))
+        np.save(os.path.join(args.save_dir, 'annotations', f"{doc_name}.npy"), soft_classes)

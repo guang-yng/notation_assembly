@@ -97,3 +97,5 @@ For example, to run inference on essential classes and visualize the result:
 ```bash
 python infer.py --classes essential --visualize
 ```
+
+To show grids in the visualization, add `--grids` option.
