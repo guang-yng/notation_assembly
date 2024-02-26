@@ -77,17 +77,17 @@ Here are some default config files:
 
 To get the predictions on test dataset, run the following script:
 ```
-usage: infer.py [-h] [--model MODEL] [--data DATA] [--classes CLASSES] [--visualize] [--grids] [--batch_size BATCH_SIZE]
-                [--save_dir SAVE_DIR]
+usage: infer.py [-h] [--model MODEL] [--data DATA] [--images IMAGES] [--classes CLASSES] [--visualize] [--grids] [--links] [--batch_size BATCH_SIZE] [--save_dir SAVE_DIR]
 
 optional arguments:
   -h, --help            show this help message and exit
   --model MODEL         The model to load.
-  --data DATA           The dataset path.
-  --classes CLASSES     The path to the musima classes definition xml file. If set to '20', 20 restricted classes are used. If set to
-                        'essential', essential classes are used.
+  --data DATA           The dataset path. Used to link to original images and read ground truths.
+  --images IMAGES       The path to images to be predict.
+  --classes CLASSES     The path to the musima classes definition xml file. If set to '20', 20 restricted classes are used. If set to 'essential', essential classes are used.
   --visualize           Whether visualize the result
   --grids               Whether to visualize the girds. Only valid when --visualize is set.
+  --links               Whether to generate psuedo edges in annotations.
   --batch_size BATCH_SIZE
                         The batch size for inference.
   --save_dir SAVE_DIR   The directory to save results
@@ -95,7 +95,7 @@ optional arguments:
 
 For example, to run inference on essential classes and visualize the result:
 ```bash
-python infer.py --classes essential --visualize
+python infer.py --classes essential --visualize --links
 ```
 
 To show grids in the visualization, add `--grids` option.

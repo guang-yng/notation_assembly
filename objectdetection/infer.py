@@ -1,12 +1,14 @@
 import os
+import torch, torchvision
+import scipy
 import numpy as np
 from xml.etree import ElementTree
+from mung.io import read_nodes_from_file
 import xml.etree.ElementTree as ET
 from tqdm import tqdm
 from PIL import Image, ImageDraw
 from model import YOLOSoft
 from argparse import ArgumentParser
-from ultralytics.utils.metrics import bbox_iou
 from ultralytics.utils.plotting import Colors
 from constants import RESTRICTEDCLASSES20, ESSENTIALCLSSES
 
@@ -31,25 +33,32 @@ def bbox_iop(box1, box2, eps=1e-7):
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument('--model', default='runs/detect/train-v8l-b8-i640-essn/train/weights/best.pt', help='The model to load.')
-    parser.add_argument('--data', default='MUSCIMA++/datasets_r_staff_essential_crop', help='The dataset path.')
+    parser.add_argument('--data', default='MUSCIMA++/v2.0', help='The dataset path. Used to link to original images and read ground truths.')
+    parser.add_argument('--images', default='MUSCIMA++/datasets_r_staff/images', help='The path to images to be predict.')
     parser.add_argument('--classes', default='MUSCIMA++/v2.0/specifications/mff-muscima-mlclasses-annot.xml',
                         help="The path to the musima classes definition xml file. If set to '20', 20 restricted classes are used. If set to 'essential', essential classes are used.")
     parser.add_argument('--visualize', action='store_true', help='Whether visualize the result')
     parser.add_argument('--grids', action='store_true', help='Whether to visualize the girds. Only valid when --visualize is set.')
-    parser.add_argument('--batch_size', default=8, help='The batch size for inference.')
-    parser.add_argument('--save_dir', default='predict', help='The directory to save results')
+    parser.add_argument('--links', action='store_true', help='Whether to generate psuedo edges in annotations.')
+    parser.add_argument('--batch_size', default=16, help='The batch size for inference.')
+    parser.add_argument('--save_dir', default='MUSCIMA++/v2.0_gen', help='The directory to save results')
     args = parser.parse_args()
 
     os.makedirs(args.save_dir, exist_ok=True)
+    os.makedirs(os.path.join(args.save_dir, 'data'), exist_ok=True)
+    os.chmod(args.save_dir, 0o777)
+    os.chmod(os.path.join(args.save_dir, 'data'), 0o777)
+    save_img_dir = os.path.join(args.save_dir, 'data', 'images')
+    if not os.path.exists(save_img_dir):
+        os.symlink(os.path.abspath(os.path.join(args.data, 'data', 'images')), save_img_dir, target_is_directory=True)
 
     print("Loading model...")
     model = YOLOSoft(args.model)
     print("Done.")
-    test_path = os.path.join(args.data, 'test', 'images')
     images = []
     indices = []
-    for img_name in tqdm(os.listdir(test_path), desc='splitting images..'):
-        img = Image.open(os.path.join(test_path, img_name))
+    for img_name in tqdm(os.listdir(args.images), desc='splitting images..'):
+        img = Image.open(os.path.join(args.images, img_name))
         W, H = img.size
         x_steps, y_steps = (W-1)//STEP_SIZE + 1, (H-1)//STEP_SIZE + 1
         for x_id in range(x_steps):
@@ -57,7 +66,7 @@ if __name__ == "__main__":
                 offset = (x_id*STEP_SIZE-MARGIN, y_id*STEP_SIZE-MARGIN)
                 subimage = img.crop((offset[0], offset[1], offset[0]+PATCH_SIZE, offset[1]+PATCH_SIZE))
                 images.append(subimage)
-                indices.append((img_name, x_id, y_id))
+                indices.append((img_name.replace('symbol', 'ideal'), x_id, y_id))
     results = []
     for idx in tqdm(range(0, len(images), args.batch_size), desc='predicting...'):
         batch_imgs = images[idx:min(idx+args.batch_size, len(images))]
@@ -75,7 +84,7 @@ if __name__ == "__main__":
         def remove_truncated(plist, true_box, prob):
             to_remove = None
             for idx, (box_pre, prob_pre) in enumerate(plist):
-                if np.dot(prob.data, prob_pre.data) < 0.25:
+                if np.dot(prob.data, prob_pre.data) < 0.10:
                     continue
                 if bbox_iop(box_pre, true_box) > 0.80:
                     to_remove = idx
@@ -100,10 +109,12 @@ if __name__ == "__main__":
             
     # Visualize
     if args.visualize:
-        os.makedirs(os.path.join(args.save_dir, 'visualization'), exist_ok=True)
+        os.makedirs(os.path.join(args.save_dir, 'data', 'visualization'), exist_ok=True)
+        os.chmod(os.path.join(args.save_dir, 'data', 'visualization'), 0o777)
         color_palette = Colors()
         for img_name, preds_dict in tqdm(imgname2preds.items(), desc="saving visualization files..."):
-            img = Image.open(os.path.join(test_path, img_name)).convert("RGB")
+            img_n = img_name.replace('ideal', 'symbol')
+            img = Image.open(os.path.join(args.images, img_n)).convert("RGB")
             draw = ImageDraw.Draw(img)
             for (x_id, y_id), preds_list in preds_dict.items():
                 for box, prob in preds_list:
@@ -111,7 +122,7 @@ if __name__ == "__main__":
                 if args.grids:
                     draw.rectangle((x_id*STEP_SIZE, y_id*STEP_SIZE, (x_id+1)*STEP_SIZE, (y_id+1)*STEP_SIZE), outline=(255, 255, 255), width=2)
                     draw.rectangle((x_id*STEP_SIZE+MARGIN, y_id*STEP_SIZE+MARGIN, (x_id+1)*STEP_SIZE-MARGIN, (y_id+1)*STEP_SIZE-MARGIN), outline=(255, 255, 255), width=2)
-            img.save(os.path.join(args.save_dir, 'visualization', img_name))
+            img.save(os.path.join(args.save_dir, 'data', 'visualization', img_n))
     
     # Load classes
     if args.classes == '20':
@@ -134,8 +145,45 @@ if __name__ == "__main__":
             clsname2id[idcls[1]] = idx
     id2clsname = {clsname2id[k]: k for k in clsname2id}
 
+    # Generate pseudo links
+    if args.links:
+        imgname2links = {}
+        for img_name, preds_dict in tqdm(imgname2preds.items(), desc="creating pseudo links..."):
+            pseudo_links = []
+            imgname2links[img_name] = pseudo_links
+            boxes, probs = [], []
+            for preds_list in preds_dict.values():
+                for box, prob in preds_list:
+                    boxes.append(box)
+                    probs.append(prob.data)
+                    pseudo_links.append([])
+            boxes = np.stack(boxes)
+            probs = np.stack(probs)
+            doc_name = img_name.split('.')[0]
+            nodes = read_nodes_from_file(os.path.join(args.data, 'data', 'annotations', f"{doc_name}.xml"))
+            nodes = [node for node in nodes if node.class_name in clsname2id]
+            boxes_g = []
+            prob_matrix = []
+            id2idx = {}
+            for idx, node in enumerate(nodes):
+                id2idx[node.id] = idx
+                prob_matrix.append(probs[:, clsname2id[node.class_name]])
+                boxes_g.append((node.left, node.top, node.right, node.bottom))
+            prob_matrix = np.stack(prob_matrix).transpose()
+            box_matrix = torchvision.ops.box_iou(torch.tensor(boxes), torch.tensor(boxes_g)).numpy()
+            cost_matrix = np.multiply(box_matrix, prob_matrix)
+            row_indices, col_indices = scipy.optimize.linear_sum_assignment(-cost_matrix)
+            match_b = {col_idx:row_idx for row_idx, col_idx in zip(row_indices, col_indices) if cost_matrix[row_idx, col_idx] > 0.05}
+            for col_idx in match_b:
+                for to_id in nodes[col_idx].outlinks:
+                    if to_id not in id2idx:
+                        continue
+                    if id2idx[to_id] in match_b:
+                        pseudo_links[match_b[col_idx]].append(match_b[id2idx[to_id]])
+
     # Saving results
-    os.makedirs(os.path.join(args.save_dir, 'annotations'), exist_ok=True)
+    os.makedirs(os.path.join(args.save_dir, 'data', 'annotations'), exist_ok=True)
+    os.chmod(os.path.join(args.save_dir, 'data', 'annotations'), 0o777)
     for img_name, preds_dict in tqdm(imgname2preds.items(), desc="saving predictions..."):
         doc_name = img_name.split('.')[0].replace('symbol', 'ideal')
         root = ET.Element("Nodes")
@@ -148,14 +196,16 @@ if __name__ == "__main__":
         for preds_list in preds_dict.values():
             for box, prob in preds_list:
                 node = ET.SubElement(root, "Node")
+                soft_classes.append(prob.data)
                 ET.SubElement(node, "Id").text = str(count)
                 ET.SubElement(node, "ClassName").text = id2clsname[int(prob.top1)]
-                soft_classes.append(prob.data)
                 ET.SubElement(node, "Top").text = str(box[1].item())
                 ET.SubElement(node, "Left").text = str(box[0].item())
                 ET.SubElement(node, "Width").text = str((box[2]-box[0]).item())
                 ET.SubElement(node, "Height").text = str((box[3]-box[1]).item())
+                if args.links:
+                    ET.SubElement(node, "Outlinks").text = " ".join(str(i) for i in imgname2links[img_name][count])
                 count += 1
         ET.indent(root, space="\t", level=0)
-        ET.ElementTree(root).write(os.path.join(args.save_dir, 'annotations', f"{doc_name}.xml"))
-        np.save(os.path.join(args.save_dir, 'annotations', f"{doc_name}.npy"), soft_classes)
+        ET.ElementTree(root).write(os.path.join(args.save_dir, 'data', 'annotations', f"{doc_name}.xml"))
+        np.save(os.path.join(args.save_dir, 'data', 'annotations', f"{doc_name}.npy"), soft_classes)
