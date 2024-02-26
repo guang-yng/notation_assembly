@@ -1,4 +1,5 @@
 import os
+import yaml
 import shutil
 from tqdm import tqdm
 import random
@@ -9,8 +10,10 @@ import shutil
 from PIL import Image
 from constants import RESTRICTEDCLASSES20, ESSENTIALCLSSES
 
-def set_seed(seed):
-    random.seed(seed)
+def load_split(split_file):
+    with open(split_file, 'rb') as hdl:
+        split = yaml.load(hdl, Loader=yaml.FullLoader)
+    return split
 
 def generate(docs, clsname2id, save_dir, mode, crop_times, image_source_dir):
     images_dir = os.path.join(save_dir, mode, 'images')
@@ -97,20 +100,17 @@ if __name__ == "__main__":
                         help="The path to the musima classes definition xml file. If set to '20', 20 restricted classes are used. If set to 'essential', essential classes are used.")
     parser.add_argument('--save_dir', default='MUSCIMA++/datasets_r_staff_20_crop', help='The output directory')
     parser.add_argument('--save_config', default='data_staff_removed_20_crop.yaml', help='The path to save yaml file')
-    parser.add_argument('--seed', default=314, help='random seed')
+    parser.add_argument('--split_file', default='../splits/mob_split.yaml', help='The split yaml file.')
     parser.add_argument('--crop_times', default=14, type=int, help='number of crops for each image')
                         
     args = parser.parse_args()
 
-    set_seed(args.seed)
-
     print("Reading annotations...")
-    cropobject_fnames = [os.path.join(args.data, f) for f in os.listdir(args.data) if f.endswith('xml')]
-    docs = [read_nodes_from_file(f) for f in cropobject_fnames]
-    random.shuffle(docs)
-    train_docs = docs[:int(0.6*len(docs))]
-    val_docs = docs[int(0.6*len(docs)): int(0.8*len(docs))]
-    test_docs = docs[int(0.8*len(docs)):]
+    split_file = load_split(args.split_file)
+    docs = {}
+    for mode in ("train", "valid", "test"):
+        cropobject_fnames = [os.path.join(args.data, f) for f in os.listdir(args.data) if os.path.splitext(os.path.basename(f))[0] in split_file[mode]]
+        docs[mode] = [read_nodes_from_file(f) for f in cropobject_fnames]
     print("Annotations Loaded.")
 
     if args.classes == '20':
@@ -132,9 +132,9 @@ if __name__ == "__main__":
         for idx, idcls in enumerate(idclsname):
             clsname2id[idcls[1]] = idx
 
-    for mode, doc_split in zip(("train", "valid", "test"), (train_docs, val_docs, test_docs)):
+    for mode in "train", "valid", "test":
         print(f"Processing {mode}...")
-        generate(doc_split, clsname2id, args.save_dir, mode, args.crop_times, args.image_dir)
+        generate(docs[mode], clsname2id, args.save_dir, mode, args.crop_times, args.image_dir)
         print("DONE.")
 
     print("Writing yaml...")

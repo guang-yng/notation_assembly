@@ -4,18 +4,20 @@
 
 Use the scrip `data_gen.py` to generate new dataset.
 ```
-usage: data_gen.py [-h] [-d DATA] [--image_dir IMAGE_DIR] [--classes CLASSES] [--save_dir SAVE_DIR] [--save_config SAVE_CONFIG] [--seed SEED] [--crop_times CROP_TIMES]                   
+usage: data_gen.py [-h] [-d DATA] [--image_dir IMAGE_DIR] [--classes CLASSES] [--save_dir SAVE_DIR] [--save_config SAVE_CONFIG] [--split_file SPLIT_FILE] [--crop_times CROP_TIMES]
 
 optional arguments:
   -h, --help            show this help message and exit
   -d DATA, --data DATA  data directory of annotations
   --image_dir IMAGE_DIR
                         data directory of images
-  --classes CLASSES     The path to the musima classes definition xml file. If set to '20', 20 restricted classes are used. If set to 'essential', essential classes are used.
+  --classes CLASSES     The path to the musima classes definition xml file. If set to '20', 20 restricted classes are used. If set to
+                        'essential', essential classes are used.
   --save_dir SAVE_DIR   The output directory
   --save_config SAVE_CONFIG
                         The path to save yaml file
-  --seed SEED           random seed
+  --split_file SPLIT_FILE
+                        The split yaml file.
   --crop_times CROP_TIMES
                         number of crops for each image
 ```
@@ -40,7 +42,7 @@ python data_gen.py --image_dir MUSCIMA++/datasets_w_staff/images --save_dir MUSC
 
 Generating cropped dataset with staff removed and essential classes:
 ```bash
-python data_gen.py --classes essential --save_dir MUSCIMA++/datasets_r_staff_essential_crop --save_config data_staff_removed_essesntial_crop.yaml
+python data_gen.py --classes essential --save_dir MUSCIMA++/datasets_r_staff_essential_crop --save_config data_staff_removed_essential_crop.yaml
 ```
 
 ## Training
