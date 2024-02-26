@@ -199,10 +199,10 @@ if __name__ == "__main__":
                 soft_classes.append(prob.data)
                 ET.SubElement(node, "Id").text = str(count)
                 ET.SubElement(node, "ClassName").text = id2clsname[int(prob.top1)]
-                ET.SubElement(node, "Top").text = str(box[1].item())
-                ET.SubElement(node, "Left").text = str(box[0].item())
-                ET.SubElement(node, "Width").text = str((box[2]-box[0]).item())
-                ET.SubElement(node, "Height").text = str((box[3]-box[1]).item())
+                ET.SubElement(node, "Top").text = str(round(box[1].item()))
+                ET.SubElement(node, "Left").text = str(round(box[0].item()))
+                ET.SubElement(node, "Width").text = str(round((box[2]-box[0]).item()))
+                ET.SubElement(node, "Height").text = str(round((box[3]-box[1]).item()))
                 if args.links:
                     ET.SubElement(node, "Outlinks").text = " ".join(str(i) for i in imgname2links[img_name][count])
                 count += 1
