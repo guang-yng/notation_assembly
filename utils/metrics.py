@@ -56,6 +56,8 @@ def matching_score(nodes_list, probs, edges_list, gt_list, curve=False, clsname2
     for i, j, _ in sorted(edges_list, key=lambda x:x[2], reverse=True):
         if not curve and _ < edge_threshold:
             break
+        if i not in match_a or j not in match_a: # Redudant nodes
+            continue
         _i, _j = match_a[i], match_a[j]
         if ((_i, _j) if _i < _j else (_j, _i)) in all_edges:
             TP += 1
