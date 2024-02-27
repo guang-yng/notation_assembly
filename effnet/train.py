@@ -177,7 +177,7 @@ def main(args, data, cfg, device):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-m', '--mung_root', default="data/MUSCIMA++/v2.0_gen/data/", help="The root directory of the detection output")
+    parser.add_argument('-m', '--mung_root', default="data/MUSCIMA++/v2.0/data/", help="The root directory of the detection output")
     parser.add_argument('-g', '--gt_mung_root', default="data/MUSCIMA++/v2.0/data/", help="The root directory of the ground truth MUSCIMA++ dataset")
     parser.add_argument('-i', '--image_root', default="data/MUSCIMA++/v2.0/data/images/", help="The root directory of the MUSCIMA++ images")
     parser.add_argument('-s', '--split_file', default="splits/mob_split.yaml", help="The split file")
@@ -232,6 +232,7 @@ if __name__ == "__main__":
             load_test_data=False,
             class_perturb=args.class_perturb
         )
+    breakpoint()
 
     if cfg.SYSTEM.NUM_GPUS > 0:
         if not torch.cuda.is_available():
