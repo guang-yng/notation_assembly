@@ -19,10 +19,10 @@ Check codes for possible options.
 
 ## Notation Assembler Training
 ```bash
-python -m effnet.train --model_config configs/effnet/MLP32.yaml
+python -m effnet.train --model_config configs/effnet/MLP32_nogrammar.yaml --exp_name MLP32_nogrammar.yaml
 ```
 
-To test the model, pass *--test_only* to the above command.
+To test the model, pass *--test_only* or *--val_only* to the above command.
 
 ## Object Detection Data & Training
 Check [README](objectdetection/README.md) for details.
