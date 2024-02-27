@@ -147,16 +147,18 @@ if __name__ == "__main__":
 
     # Generate pseudo links
     if args.links:
-        imgname2links = {}
+        imgname2links, imgname2unlinks = {}, {}
         for img_name, preds_dict in tqdm(imgname2preds.items(), desc="creating pseudo links..."):
-            pseudo_links = []
+            pseudo_links, pseudo_unlinks = [], []
             imgname2links[img_name] = pseudo_links
+            imgname2unlinks[img_name] = pseudo_unlinks
             boxes, probs = [], []
             for preds_list in preds_dict.values():
                 for box, prob in preds_list:
                     boxes.append(box)
                     probs.append(prob.data)
                     pseudo_links.append([])
+                    pseudo_unlinks.append([])
             boxes = np.stack(boxes)
             probs = np.stack(probs)
             doc_name = img_name.split('.')[0]
@@ -174,12 +176,16 @@ if __name__ == "__main__":
             cost_matrix = np.multiply(box_matrix, prob_matrix)
             row_indices, col_indices = scipy.optimize.linear_sum_assignment(-cost_matrix)
             match_b = {col_idx:row_idx for row_idx, col_idx in zip(row_indices, col_indices) if cost_matrix[row_idx, col_idx] > 0.05}
+            unconnected_idx = set((i, j) for i in match_b for j in match_b if (i <= j))
             for col_idx in match_b:
                 for to_id in nodes[col_idx].outlinks:
                     if to_id not in id2idx:
                         continue
                     if id2idx[to_id] in match_b:
+                        unconnected_idx.remove((col_idx, id2idx[to_id]) if col_idx < id2idx[to_id] else (id2idx[to_id], col_idx) )
                         pseudo_links[match_b[col_idx]].append(match_b[id2idx[to_id]])
+            for idx1, idx2 in unconnected_idx:
+                pseudo_unlinks[match_b[idx1]].append(match_b[idx2])
 
     # Saving results
     os.makedirs(os.path.join(args.save_dir, 'data', 'annotations'), exist_ok=True)
@@ -205,6 +211,7 @@ if __name__ == "__main__":
                 ET.SubElement(node, "Height").text = str(round((box[3]-box[1]).item()))
                 if args.links:
                     ET.SubElement(node, "Outlinks").text = " ".join(str(i) for i in imgname2links[img_name][count])
+                    ET.SubElement(node, "UnOutlinks").text = " ".join(str(i) for i in imgname2unlinks[img_name][count])
                 count += 1
         ET.indent(root, space="\t", level=0)
         ET.ElementTree(root).write(os.path.join(args.save_dir, 'data', 'annotations', f"{doc_name}.xml"))
