@@ -3,7 +3,7 @@ import numpy as np
 import scipy
 from .constants import ESSENTIALCLSSES
 
-def matching_score(nodes_list, probs, edges_list, gt_list, curve=False, clsname2id=ESSENTIALCLSSES, edge_threshold=0.5):
+def compute_matching_score(nodes_list, probs, edges_list, gt_list, curve=False, clsname2id=ESSENTIALCLSSES, edge_threshold=0.5):
     """
     Calculating matching F1 score / Precision-Recall curve.
 
@@ -85,6 +85,6 @@ if __name__ == "__main__":
         for j in node.outlinks:
             if j in id2idx:
                 edges_list.append((i, j, 1.0))
-    precision, recall = matching_score(nodes_list, probs, edges_list, gt_list, curve=True) # Precision all 1.0, Recall from 0.0 to 0.8797
+    precision, recall = compute_matching_score(nodes_list, probs, edges_list, gt_list, curve=True) # Precision all 1.0, Recall from 0.0 to 0.8797
     assert np.all(np.equal(precision, 1.0))
-    print(matching_score(nodes_list, probs, edges_list, gt_list)) # Reference value : 0.9359756097560976
+    print(compute_matching_score(nodes_list, probs, edges_list, gt_list)) # Reference value : 0.9359756097560976

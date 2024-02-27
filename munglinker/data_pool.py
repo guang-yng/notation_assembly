@@ -148,11 +148,6 @@ class PairwiseMungoDataPool(Dataset):
             for m in mung.vertices:
                 m.scale(zoom=self.zoom)
 
-    def shuffle_batches(self):
-        """ Shuffles the order in which the batches will be iterated """
-        permutation = [int(i) for i in np.random.permutation(len(self.train_entities))]
-        shuffled_train_entities = [self.train_entities[idx] for idx in permutation]
-        self.train_entities = shuffled_train_entities
 
     def prepare_train_entities(self):
         """Extract the triplets.
@@ -164,6 +159,7 @@ class PairwiseMungoDataPool(Dataset):
         """
         self.train_entities = []
         self.all_mungo_pairs = []  # type: List[Tuple[Node, Node]]
+        self.inference_graph = {}
         number_of_samples = 0
         for mung_index, mung in enumerate(tqdm(self.mungs, desc="Loading MuNG-pairs")):
             if self.filter_pairs:
@@ -177,12 +173,37 @@ class PairwiseMungoDataPool(Dataset):
                     for m_to in mung.vertices:
                         if m_from.id != m_to.id:
                             object_pairs.append((m_from, m_to))
+            self.inference_graph[mung_index] = object_pairs
             for (m_from, m_to) in object_pairs:
                 self.all_mungo_pairs.append((m_from, m_to))
                 self.train_entities.append([mung_index, number_of_samples])
                 number_of_samples += 1
 
         self.length = number_of_samples
+
+    
+    def get_inference_graph(self):
+        # Convert everything into a dict of batched tensor for each graph
+        print("Preparing graph for inference...")
+        for idx, graph in tqdm(self.inference_graph.items()):
+            tensor_dict = {"source_bbox": [], "source_class": [], "target_bbox": [], "target_class": [], "label": [], 
+                           "source_id": [], "target_id": []}
+            for pair in graph:
+                source_bbox = torch.tensor(pair[0].bounding_box)
+                source_class = torch.tensor(node_classes_dict[pair[0].class_name])
+                target_bbox = torch.tensor(pair[1].bounding_box)
+                target_class = torch.tensor(node_classes_dict[pair[1].class_name])
+                label = torch.tensor(pair[1].id in pair[0].outlinks).unsqueeze(-1).float()
+                tensor_dict["source_bbox"].append(source_bbox)
+                tensor_dict["source_class"].append(source_class)
+                tensor_dict["target_bbox"].append(target_bbox)
+                tensor_dict["target_class"].append(target_class)
+                tensor_dict["label"].append(label)
+                tensor_dict['source_id'].append(torch.tensor(pair[0].id))
+                tensor_dict['target_id'].append(torch.tensor(pair[1].id))
+            self.inference_graph[idx] = {k: torch.stack(v) for k, v in tensor_dict.items()}
+
+        return self.inference_graph
 
 
     def get_closest_objects(self, nodes: List[Node], threshold) -> Dict[Node, List[Node]]:

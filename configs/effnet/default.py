@@ -30,6 +30,9 @@ _C.TRAIN.POS_WEIGHT = 1
 _C.TRAIN.OPTIMIZER = "Adam"
 _C.TRAIN.LEARNING_RATE = 1e-3
 
+# Inference/Evaluation setup
+_C.EVAL = CN()
+_C.EVAL.BATCH_SIZE = 32
 
 def get_cfg_defaults():
   """Get a yacs CfgNode object with default values for my_project."""
