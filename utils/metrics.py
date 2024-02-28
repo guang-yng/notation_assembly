@@ -79,6 +79,7 @@ if __name__ == "__main__":
     nodes_list = read_nodes_from_file("/local1/MUSCIMA/v2.0_gen/data/annotations/CVC-MUSCIMA_W-01_N-10_D-ideal.xml")
     probs = np.load("/local1/MUSCIMA/v2.0_gen/data/annotations/CVC-MUSCIMA_W-01_N-10_D-ideal.npy")
     gt_list = read_nodes_from_file("/local1/MUSCIMA/v2.0/data/annotations/CVC-MUSCIMA_W-01_N-10_D-ideal.xml")
+    assert len(nodes_list[0].data['unoutlinks']) == 73 # The false edges
     id2idx = {node.id: i for i, node in enumerate(nodes_list)} ## In this example, id and idx are the same
     edges_list = []
     for i, node in enumerate(nodes_list):

@@ -211,7 +211,8 @@ if __name__ == "__main__":
                 ET.SubElement(node, "Height").text = str(round((box[3]-box[1]).item()))
                 if args.links:
                     ET.SubElement(node, "Outlinks").text = " ".join(str(i) for i in imgname2links[img_name][count])
-                    ET.SubElement(node, "UnOutlinks").text = " ".join(str(i) for i in imgname2unlinks[img_name][count])
+                    data = ET.SubElement(node, "Data")
+                    ET.SubElement(data, "DataItem", {"key": "unoutlinks", "type": "list[int]"}).text = " ".join(str(i) for i in imgname2unlinks[img_name][count])
                 count += 1
         ET.indent(root, space="\t", level=0)
         ET.ElementTree(root).write(os.path.join(args.save_dir, 'data', 'annotations', f"{doc_name}.xml"))
