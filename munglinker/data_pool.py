@@ -77,6 +77,7 @@ class PairwiseMungoDataPool(Dataset):
         self.mungs = mungs
         self.images = images
 
+        self.normalize_bbox = normalize_bbox
         if normalize_bbox:
             for mung, image in zip(self.mungs, self.images):
                 for node in mung.vertices:
@@ -112,12 +113,19 @@ class PairwiseMungoDataPool(Dataset):
     def __getitem__(self, idx):
         mung_from = self.all_mungo_pairs[idx][0]
         mung_to = self.all_mungo_pairs[idx][1]
-        source_bbox = torch.tensor(mung_from.bounding_box)
+        if self.normalize_bbox:
+            image_shape = self.images[self.train_entities[idx][0]].shape
+            reshape_weight = torch.tensor([1 / image_shape[0], 1 / image_shape[1],
+                                           1 / image_shape[0], 1 / image_shape[1]])
+        else:
+            reshape_weight = torch.ones(4)
+
+        source_bbox = torch.tensor(mung_from.bounding_box) * reshape_weight
         if random.random() < self.class_perturb:
             source_class = torch.tensor(random.choice(list(node_class_dict_count100.values())))
         else:
             source_class = torch.tensor(node_classes_dict[mung_from.class_name])
-        target_bbox = torch.tensor(mung_to.bounding_box)
+        target_bbox = torch.tensor(mung_to.bounding_box) * reshape_weight
         target_class = torch.tensor(node_classes_dict[mung_to.class_name])
         label = torch.tensor(mung_to.id in mung_from.outlinks).unsqueeze(-1).float()
 
@@ -436,7 +444,7 @@ def load_munglinker_data(mung_root, images_root, split_file,
                                                      include_names=split['valid'],
                                                      exclude_classes=exclude_classes,
                                                      masks_to_bounding_boxes=train_on_bounding_boxes)
-        validation_pool = PairwiseMungoDataPool(mungs=va_mungs, images=va_images, filter_pairs=False, **validation_data_pool_dict)
+        validation_pool = PairwiseMungoDataPool(mungs=va_mungs, images=va_images, filter_pairs=True, **validation_data_pool_dict)
 
     if load_test_data:
         print("Loading test data...")
@@ -444,6 +452,6 @@ def load_munglinker_data(mung_root, images_root, split_file,
                                                      include_names=split['test'],
                                                      exclude_classes=exclude_classes,
                                                      masks_to_bounding_boxes=train_on_bounding_boxes)
-        test_pool = PairwiseMungoDataPool(mungs=te_mungs, images=te_images, filter_pairs=False, **data_pool_dict)
+        test_pool = PairwiseMungoDataPool(mungs=te_mungs, images=te_images, filter_pairs=True, **data_pool_dict)
 
     return dict(train=training_pool, valid=validation_pool, test=test_pool)
