@@ -10,7 +10,7 @@ from PIL import Image, ImageDraw
 from model import YOLOSoft
 from argparse import ArgumentParser
 from ultralytics.utils.plotting import Colors
-from constants import RESTRICTEDCLASSES20, ESSENTIALCLSSES
+from constants import RESTRICTEDCLASSES20, ESSENTIALCLSSES, node_classes_dict
 
 PATCH_SIZE=1216
 N_CLASSES=128
@@ -206,25 +206,14 @@ if __name__ == "__main__":
             img.save(os.path.join(args.save_dir, 'data', 'visualization', img_n))
     
     # Load classes
+    clsname2id = node_classes_dict
     if args.classes == '20':
-        clsname2id = RESTRICTEDCLASSES20
-        idclsname = [(0, 'noteheadEmpty')] + [(clsname2id[clsname], clsname) for clsname in clsname2id if clsname2id[clsname] != 0]
+        clsnames = RESTRICTEDCLASSES20.keys()
     elif args.classes == 'essential':
-        clsname2id = ESSENTIALCLSSES
-        idclsname = [(clsname2id[clsname], clsname) for clsname in clsname2id]
+        clsnames = ESSENTIALCLSSES.keys()
     else:
-        clsname2id = {}
-        idclsname = []
-        tree = ElementTree.parse(args.classes)
-        root = tree.getroot()
-        for nodeclass in root:
-            clsname = nodeclass.find('Name').text
-            idx = nodeclass.find('Id').text
-            idclsname.append((int(idx), clsname))
-        idclsname.sort()
-        for idx, idcls in enumerate(idclsname):
-            clsname2id[idcls[1]] = idx
-    id2clsname = {clsname2id[k]: k for k in clsname2id}
+        clsnames = clsname2id.keys()
+    id2clsname = {idx : clsname for clsname, idx in clsname2id.items()}
 
     # Generate pseudo links
     if args.links:
@@ -244,7 +233,7 @@ if __name__ == "__main__":
             probs = np.stack(probs)
             doc_name = img_name.split('.')[0]
             nodes = read_nodes_from_file(os.path.join(args.data, 'data', 'annotations', f"{doc_name}.xml"))
-            nodes = [node for node in nodes if node.class_name in clsname2id]
+            nodes = [node for node in nodes if node.class_name in clsnames]
             boxes_g = []
             prob_matrix = []
             id2idx = {}

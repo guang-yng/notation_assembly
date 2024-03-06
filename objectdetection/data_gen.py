@@ -8,14 +8,14 @@ from xml.etree import ElementTree
 from mung.io import read_nodes_from_file
 import shutil
 from PIL import Image
-from constants import RESTRICTEDCLASSES20, ESSENTIALCLSSES
+from constants import RESTRICTEDCLASSES20, ESSENTIALCLSSES, node_classes_dict
 
 def load_split(split_file):
     with open(split_file, 'rb') as hdl:
         split = yaml.load(hdl, Loader=yaml.FullLoader)
     return split
 
-def generate(docs, clsname2id, save_dir, mode, crop_times, image_source_dir):
+def generate(docs, clsnames, clsname2id, save_dir, mode, crop_times, image_source_dir):
     images_dir = os.path.join(save_dir, mode, 'images')
     labels_dir = os.path.join(save_dir, mode, 'labels')
     # Create (or clear) directories
@@ -44,7 +44,7 @@ def generate(docs, clsname2id, save_dir, mode, crop_times, image_source_dir):
                 for _, node in enumerate(doc):
                     # exclude staff class 
                     
-                    if node.class_name in clsname2id:
+                    if node.class_name in clsnames:
                         # Calculate normalized x_center, y_center, width, height
                         x_center = ((node.right - node.left) / 2 + node.left) / img_width
                         y_center = ((node.bottom - node.top) / 2 + node.top) / img_height
@@ -79,7 +79,7 @@ def generate(docs, clsname2id, save_dir, mode, crop_times, image_source_dir):
                         # exclude staff class 
                         if node.bottom > y+1216 or node.top < y or node.left < x or node.right > x+1216:
                             continue
-                        if node.class_name in clsname2id:
+                        if node.class_name in clsnames:
                             # Calculate normalized x_center, y_center, width, height
                             x_center = (((node.right - node.left) / 2 + node.left)-x) / 1216
                             y_center = (((node.bottom - node.top) / 2 + node.top)-y) / 1216
@@ -113,36 +113,30 @@ if __name__ == "__main__":
         docs[mode] = [read_nodes_from_file(f) for f in cropobject_fnames]
     print("Annotations Loaded.")
 
+    clsname2id = node_classes_dict
     if args.classes == '20':
-        clsname2id = RESTRICTEDCLASSES20
-        idclsname = [(0, 'noteheadEmpty')] + [(clsname2id[clsname], clsname) for clsname in clsname2id if clsname2id[clsname] != 0]
+        clsnames = RESTRICTEDCLASSES20.keys()
     elif args.classes == 'essential':
-        clsname2id = ESSENTIALCLSSES
-        idclsname = [(clsname2id[clsname], clsname) for clsname in clsname2id]
+        clsnames = ESSENTIALCLSSES.keys()
     else:
-        clsname2id = {}
-        idclsname = []
-        tree = ElementTree.parse(args.classes)
-        root = tree.getroot()
-        for nodeclass in root:
-            clsname = nodeclass.find('Name').text
-            idx = nodeclass.find('Id').text
-            idclsname.append((int(idx), clsname))
-        idclsname.sort()
-        for idx, idcls in enumerate(idclsname):
-            clsname2id[idcls[1]] = idx
+        clsnames = clsname2id.keys()
 
     for mode in "train", "valid", "test":
         print(f"Processing {mode}...")
-        generate(docs[mode], clsname2id, args.save_dir, mode, args.crop_times, args.image_dir)
+        generate(docs[mode], clsnames, clsname2id, args.save_dir, mode, args.crop_times, args.image_dir)
         print("DONE.")
 
     print("Writing yaml...")
+    id2clsname = {idx:clsname for clsname, idx in clsname2id.items()}
+    max_id = max(id2clsname.keys())
+    for i in range(1, max_id):
+        if i not in id2clsname:
+            id2clsname[i] = "NA"
     with open(args.save_config, 'w') as f:
         f.write(f"path: ../{args.save_dir} # dataset root dir\n")
         f.write("train: train/images \nval: valid/images \ntest: test/images \n\n")
         f.write("# Classes\nnames:\n")
-        for idx, idcls in enumerate(idclsname):
-            f.write(f"  {idx} : {idcls[1]}\n")
+        for idx, idcls in id2clsname.items():
+            f.write(f"  {idx} : {idcls}\n")
     
     print("DONE.")
