@@ -1,4 +1,4 @@
-path: ../MUSCIMA++/datasets_r_staff_essential_crop_all # dataset root dir
+path: ../MUSCIMA++/tmp # dataset root dir
 train: train/images 
 val: valid/images 
 test: test/images 
@@ -6,7 +6,12 @@ test: test/images
 # Classes
 names:
   0 : noteheadFull
+  1 : NA
   2 : stem
+  3 : NA
+  4 : NA
+  5 : NA
+  6 : NA
   7 : beam
   8 : augmentationDot
   9 : accidentalSharp
@@ -27,6 +32,11 @@ names:
   24 : graceNoteAcciaccatura
   25 : noteheadFullSmall
   26 : noteheadHalfSmall
+  27 : NA
+  28 : NA
+  29 : NA
+  30 : NA
+  31 : NA
   32 : staffSpace
   33 : staffLine
   34 : staff
@@ -56,6 +66,7 @@ names:
   58 : ornamentTrill
   59 : arpeggio
   60 : glissando
+  61 : NA
   62 : tremoloMark
   63 : singleNoteTremolo
   64 : multipleNoteTremolo
@@ -64,10 +75,12 @@ names:
   67 : gClef
   68 : fClef
   69 : cClef
+  70 : NA
   71 : keySignature
   72 : timeSignature
   73 : timeSigCommon
   74 : timeSigCutCommon
+  75 : NA
   76 : ossia
   77 : dynamicsText
   78 : tempoText
@@ -146,6 +159,7 @@ names:
   151 : systemSeparator
   152 : barlineDotted
   153 : figuredBassText
+  154 : NA
   155 : transpositionText
   156 : characterOther
   157 : breathMark
@@ -168,17 +182,3 @@ names:
   174 : dynamicLetterZ
   175 : dynamicLetterR
   176 : dynamicLetterN
-  1 : NA
-  3 : NA
-  4 : NA
-  5 : NA
-  6 : NA
-  27 : NA
-  28 : NA
-  29 : NA
-  30 : NA
-  31 : NA
-  61 : NA
-  70 : NA
-  75 : NA
-  154 : NA

@@ -207,13 +207,15 @@ if __name__ == "__main__":
     
     # Load classes
     clsname2id = node_classes_dict
+    id2clsname = {idx : clsname for clsname, idx in clsname2id.items()}
     if args.classes == '20':
         clsnames = RESTRICTEDCLASSES20.keys()
+        clsname2id["noteheadWhole"] = clsname2id["noteheadHalf"]
+        id2clsname[clsname2id["noteheadHalf"]] = "noteheadHalf"
     elif args.classes == 'essential':
         clsnames = ESSENTIALCLSSES.keys()
     else:
         clsnames = clsname2id.keys()
-    id2clsname = {idx : clsname for clsname, idx in clsname2id.items()}
 
     # Generate pseudo links
     if args.links:

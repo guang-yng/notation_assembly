@@ -99,7 +99,7 @@ if __name__ == "__main__":
     parser.add_argument('--classes', default='MUSCIMA++/v2.0/specifications/mff-muscima-mlclasses-annot.xml',
                         help="The path to the musima classes definition xml file. If set to '20', 20 restricted classes are used. If set to 'essential', essential classes are used.")
     parser.add_argument('--save_dir', default='MUSCIMA++/datasets_r_staff_20_crop', help='The output directory')
-    parser.add_argument('--save_config', default='data_staff_removed_20_crop.yaml', help='The path to save yaml file')
+    parser.add_argument('--save_config', default='data_staff_removed_crop_unpruned.yaml', help='The path to save yaml file')
     parser.add_argument('--split_file', default='../splits/mob_split.yaml', help='The split yaml file.')
     parser.add_argument('--crop_times', default=14, type=int, help='number of crops for each image')
                         
@@ -116,6 +116,7 @@ if __name__ == "__main__":
     clsname2id = node_classes_dict
     if args.classes == '20':
         clsnames = RESTRICTEDCLASSES20.keys()
+        clsname2id["noteheadWhole"] = clsname2id["noteheadHalf"]
     elif args.classes == 'essential':
         clsnames = ESSENTIALCLSSES.keys()
     else:
@@ -136,7 +137,7 @@ if __name__ == "__main__":
         f.write(f"path: ../{args.save_dir} # dataset root dir\n")
         f.write("train: train/images \nval: valid/images \ntest: test/images \n\n")
         f.write("# Classes\nnames:\n")
-        for idx, idcls in id2clsname.items():
+        for idx, idcls in sorted(id2clsname.items()):
             f.write(f"  {idx} : {idcls}\n")
     
     print("DONE.")

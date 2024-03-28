@@ -1,9 +1,9 @@
 import torchvision, torch
 import numpy as np
 import scipy
-from .constants import ESSENTIALCLSSES
+from .constants import node_classes_dict
 
-def compute_matching_score(nodes_list, probs, edges_list, gt_list, curve=False, clsname2id=ESSENTIALCLSSES, edge_threshold=0.5):
+def compute_matching_score(nodes_list, probs, edges_list, gt_list, curve=False, clsnames=node_classes_dict.keys(), edge_threshold=0.5):
     """
     Calculating matching F1 score / Precision-Recall curve.
 
@@ -12,7 +12,7 @@ def compute_matching_score(nodes_list, probs, edges_list, gt_list, curve=False, 
     edges_list: a list of triplet (node1 idx, node2 idx, edge score), no repetition.
     gt_list: a list of mung.node.Node, representing ground truth nodes
     curve: whether to return a precesion-recall curve
-    classname2id: the dict from class name to class id. Default to ESSENTIALCLSSES
+    clsnames: the valid class names. Default to node_classes_dict.keys()
     edge_threshold: the threshold for edge scores, used for calculating F1 score with curve=False.
 
     When curve = False, return the F1 score
@@ -24,7 +24,7 @@ def compute_matching_score(nodes_list, probs, edges_list, gt_list, curve=False, 
         boxes.append((node.left, node.top, node.right, node.bottom))
 
     # Filter invalid classes in gt_list
-    gt_list_ = [node for node in gt_list if node.class_name in clsname2id]
+    gt_list_ = [node for node in gt_list if node.class_name in clsnames]
 
     # Get box matrix and prob matrix from gt_list
     boxes_g = []
@@ -32,7 +32,7 @@ def compute_matching_score(nodes_list, probs, edges_list, gt_list, curve=False, 
     id2idx = {}
     for idx, node in enumerate(gt_list_):
         id2idx[node.id] = idx
-        prob_matrix.append(probs[:, clsname2id[node.class_name]])
+        prob_matrix.append(probs[:, node_classes_dict[node.class_name]])
         boxes_g.append((node.left, node.top, node.right, node.bottom))
     prob_matrix = np.stack(prob_matrix).transpose()
 
@@ -76,16 +76,14 @@ def compute_matching_score(nodes_list, probs, edges_list, gt_list, curve=False, 
 if __name__ == "__main__":
     from mung.io import read_nodes_from_file
     import numpy as np
-    nodes_list = read_nodes_from_file("/local1/MUSCIMA/v2.0_gen/data/annotations/CVC-MUSCIMA_W-01_N-10_D-ideal.xml")
-    probs = np.load("/local1/MUSCIMA/v2.0_gen/data/annotations/CVC-MUSCIMA_W-01_N-10_D-ideal.npy")
-    gt_list = read_nodes_from_file("/local1/MUSCIMA/v2.0/data/annotations/CVC-MUSCIMA_W-01_N-10_D-ideal.xml")
-    assert len(nodes_list[0].data['unoutlinks']) == 73 # The false edges
+    nodes_list = read_nodes_from_file("data/MUSCIMA++/v2.0_gen_unpruned/data/annotations/CVC-MUSCIMA_W-01_N-10_D-ideal.xml")
+    probs = np.load("data/MUSCIMA++/v2.0_gen_unpruned/data/annotations/CVC-MUSCIMA_W-01_N-10_D-ideal.npy")
+    gt_list = read_nodes_from_file("data/MUSCIMA++/v2.0/data/annotations/CVC-MUSCIMA_W-01_N-10_D-ideal.xml")
     id2idx = {node.id: i for i, node in enumerate(nodes_list)} ## In this example, id and idx are the same
     edges_list = []
     for i, node in enumerate(nodes_list):
         for j in node.outlinks:
-            if j in id2idx:
-                edges_list.append((i, j, 1.0))
+            assert j in id2idx
+            edges_list.append((i, j, 1.0))
     precision, recall = compute_matching_score(nodes_list, probs, edges_list, gt_list, curve=True) # Precision all 1.0, Recall from 0.0 to 0.8797
-    assert np.all(np.equal(precision, 1.0))
     print(compute_matching_score(nodes_list, probs, edges_list, gt_list)) # Reference value : 0.9359756097560976
